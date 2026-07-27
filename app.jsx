@@ -1,5 +1,18 @@
 const { useState, useEffect, useCallback, useRef } = React;
 
+// 画面幅を監視し、スマートフォンなど狭い画面では2カラムのレイアウトを
+// 1カラムに切り替えるためのフック
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const handler = (e) => setMatches(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
+
 /* ---------------------------------------------------------
    アイコン(lucideの外部依存を排し、自前SVGでオフライン完結)
    元のlucide-reactアイコンと同一の見た目になるよう
@@ -585,6 +598,7 @@ function GuestCountModal({ seatNum, onConfirm, onCancel }) {
         justifyContent: "center",
         zIndex: 100,
         padding: 20,
+        overflowY: "auto",
       }}
     >
       <div
@@ -595,6 +609,7 @@ function GuestCountModal({ seatNum, onConfirm, onCancel }) {
           width: "100%",
           maxWidth: 360,
           boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+          margin: "20px 0",
         }}
       >
         <div style={{ fontFamily: MONO, fontSize: 12, color: COLORS.inkSoft, marginBottom: 4 }}>
@@ -665,6 +680,7 @@ function ConfirmModal({ title, message, confirmLabel = "OK", onConfirm, onCancel
         justifyContent: "center",
         zIndex: 150,
         padding: 20,
+        overflowY: "auto",
       }}
     >
       <div
@@ -675,6 +691,7 @@ function ConfirmModal({ title, message, confirmLabel = "OK", onConfirm, onCancel
           width: "100%",
           maxWidth: 360,
           boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+          margin: "20px 0",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -704,6 +721,7 @@ function OrderScreen({ seatNum, seat, products, now, onUpdateOrders, onBack, onG
   const categories = Array.from(new Set(products.map((p) => p.category)));
   const [activeCat, setActiveCat] = useState(categories[0] || "");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const isNarrow = useMediaQuery("(max-width: 720px)");
 
   const addProduct = (p) => {
     const price = getEffectivePrice(p, new Date());
@@ -738,9 +756,18 @@ function OrderScreen({ seatNum, seat, products, now, onUpdateOrders, onBack, onG
         }
       />
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: isNarrow ? "column" : "row", overflow: isNarrow ? "auto" : "hidden" }}>
         {/* 商品一覧 */}
-        <div style={{ flex: 1.3, display: "flex", flexDirection: "column", borderRight: `1px dashed ${COLORS.line}`, minWidth: 0 }}>
+        <div
+          style={{
+            flex: isNarrow ? "none" : 1.3,
+            display: "flex",
+            flexDirection: "column",
+            borderRight: isNarrow ? "none" : `1px dashed ${COLORS.line}`,
+            borderBottom: isNarrow ? `1px dashed ${COLORS.line}` : "none",
+            minWidth: 0,
+          }}
+        >
           <div style={{ display: "flex", gap: 6, padding: "10px 14px", overflowX: "auto", background: COLORS.paper, borderBottom: `1px solid ${COLORS.line}` }}>
             {categories.map((c) => (
               <button
@@ -763,7 +790,7 @@ function OrderScreen({ seatNum, seat, products, now, onUpdateOrders, onBack, onG
               </button>
             ))}
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+          <div style={{ flex: isNarrow ? "none" : 1, overflowY: isNarrow ? "visible" : "auto", padding: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px,1fr))", gap: 10 }}>
               {products.filter((p) => p.category === activeCat).map((p) => {
                 const nowDate = new Date(now);
@@ -806,11 +833,11 @@ function OrderScreen({ seatNum, seat, products, now, onUpdateOrders, onBack, onG
         </div>
 
         {/* 注文リスト */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 260 }}>
+        <div style={{ flex: isNarrow ? "none" : 1, display: "flex", flexDirection: "column", minWidth: isNarrow ? 0 : 260 }}>
           <div style={{ padding: "12px 16px", fontSize: 12, fontFamily: MONO, color: COLORS.inkSoft, borderBottom: `1px solid ${COLORS.line}` }}>
             ORDER LIST
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px" }}>
+          <div style={{ flex: isNarrow ? "none" : 1, overflowY: isNarrow ? "visible" : "auto", padding: "8px 16px" }}>
             {seat.orders.length === 0 && (
               <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "20px 0", textAlign: "center" }}>
                 左のメニューから商品を選択してください
@@ -893,10 +920,10 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
   const [paypay, setPaypay] = useState("");
   const [onAccount, setOnAccount] = useState("");
 
-  const cashN = Number(cash) || 0;
-  const cardN = Number(card) || 0;
-  const paypayN = Number(paypay) || 0;
-  const onAccountN = Number(onAccount) || 0;
+  const cashN = Math.max(0, Number(cash) || 0);
+  const cardN = Math.max(0, Number(card) || 0);
+  const paypayN = Math.max(0, Number(paypay) || 0);
+  const onAccountN = Math.max(0, Number(onAccount) || 0);
   const allocated = cashN + cardN + paypayN + onAccountN;
   const remaining = total - allocated;
 
@@ -972,6 +999,7 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
               <span style={{ fontFamily: MONO, color: COLORS.inkSoft }}>¥</span>
               <input
                 type="number"
+                min="0"
                 value={row.val}
                 onChange={(e) => row.set(e.target.value)}
                 placeholder="0"
@@ -1131,7 +1159,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header title="マスタ設定" onBack={onBack} />
 
-      <div style={{ display: "flex", gap: 6, padding: "12px 20px", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper }}>
+      <div style={{ display: "flex", gap: 6, padding: "12px 20px", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper, overflowX: "auto" }}>
         {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "data", label: "データ管理" }].map((t) => (
           <button
             key={t.id}
@@ -1144,6 +1172,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
               color: tab === t.id ? "#FBF9F4" : COLORS.inkSoft,
               fontSize: 13,
               fontWeight: 700,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               cursor: "pointer",
             }}
           >
@@ -1708,8 +1738,8 @@ function App() {
 
   const handleConfirmGuests = (count) => {
     const n = guestModalSeat;
-    const newSeats = { ...data.seats, [n]: { guests: count, startTime: new Date().toISOString(), orders: [] } };
-    persist({ ...data, seats: newSeats });
+    const newSeats = { ...dataRef.current.seats, [n]: { guests: count, startTime: new Date().toISOString(), orders: [] } };
+    persist({ ...dataRef.current, seats: newSeats });
     setGuestModalSeat(null);
     setActiveSeat(n);
     setScreen("order");
@@ -1761,13 +1791,13 @@ function App() {
 
   return (
     <div
+      className="pos-app-shell"
       style={{
         fontFamily: SANS,
         background: COLORS.bg,
         color: COLORS.ink,
         height: "100vh",
         maxHeight: 780,
-        minHeight: 560,
         display: "flex",
         flexDirection: "column",
         borderRadius: 10,

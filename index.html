@@ -54,6 +54,11 @@
     color: #5B6459;
     background: #EFEBE2;
   }
+  /* アドレスバーの出し引きでビューポート高さが変動する端末でも
+     コンテンツが隠れないよう、対応ブラウザでは動的ビューポート単位を使う */
+  @supports (height: 100dvh) {
+    .pos-app-shell { height: 100dvh !important; }
+  }
 </style>
 </head>
 <body>
