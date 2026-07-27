@@ -184,6 +184,7 @@ function defaultData() {
     salesHistory: [],
     serviceChargeRate: 0, // %
     taxRate: 10, // %
+    payroll: { employees: [], shifts: [] },
   };
 }
 
@@ -396,6 +397,63 @@ function Header({ title, onBack, right }) {
   );
 }
 
+function HeaderIconButton({ icon: Icon, onClick, title }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        background: "rgba(255,255,255,0.12)",
+        border: "none",
+        borderRadius: 6,
+        width: 34,
+        height: 34,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        color: "#FBF9F4",
+        flexShrink: 0,
+      }}
+    >
+      <Icon size={18} />
+    </button>
+  );
+}
+
+const HOME_TABS = [
+  { id: "seats", label: "座席一覧" },
+  { id: "payroll", label: "アルバイト管理" },
+  { id: "history", label: "売上履歴" },
+];
+
+function HomeTabBar({ active, onSelect }) {
+  return (
+    <div style={{ display: "flex", gap: 6, padding: "12px 20px", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper, overflowX: "auto" }}>
+      {HOME_TABS.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onSelect(t.id)}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 20,
+            border: `1.5px solid ${active === t.id ? COLORS.teal : COLORS.line}`,
+            background: active === t.id ? COLORS.teal : "transparent",
+            color: active === t.id ? "#FBF9F4" : COLORS.inkSoft,
+            fontSize: 13,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+            cursor: "pointer",
+          }}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Toast({ message }) {
   if (!message) return null;
   return (
@@ -426,7 +484,7 @@ function Toast({ message }) {
 /* ---------------------------------------------------------
    トップ画面(座席一覧)
 --------------------------------------------------------- */
-function TopScreen({ data, now, onSelectSeat, onOpenSettings, onOpenHistory }) {
+function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
   const todayTotal = data.salesHistory
     .filter((s) => isToday(s.endTime))
     .reduce((sum, s) => sum + s.total, 0);
@@ -438,48 +496,12 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, onOpenHistory }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header
         title="座席一覧"
-        right={
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={onOpenHistory}
-              style={{
-                background: "rgba(255,255,255,0.12)",
-                border: "none",
-                borderRadius: 6,
-                width: 34,
-                height: 34,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: "#FBF9F4",
-              }}
-            >
-              <History size={18} />
-            </button>
-            <button
-              onClick={onOpenSettings}
-              style={{
-                background: "rgba(255,255,255,0.12)",
-                border: "none",
-                borderRadius: 6,
-                width: 34,
-                height: 34,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: "#FBF9F4",
-              }}
-            >
-              <Settings size={18} />
-            </button>
-          </div>
-        }
+        right={<HeaderIconButton icon={Settings} onClick={onOpenSettings} title="マスタ設定" />}
       />
 
-      <button
-        onClick={onOpenHistory}
+      <HomeTabBar active={activeHomeTab} onSelect={onSelectHomeTab} />
+
+      <div
         style={{
           padding: "10px 20px",
           display: "flex",
@@ -490,18 +512,11 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, onOpenHistory }) {
           color: COLORS.inkSoft,
           borderBottom: `1px dashed ${COLORS.line}`,
           background: COLORS.paper,
-          border: "none",
-          width: "100%",
-          textAlign: "left",
-          cursor: "pointer",
         }}
       >
         <span>本日 会計 {todayCount}件</span>
         <span>売上 {formatYen(todayTotal)}</span>
-        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, color: COLORS.teal, fontWeight: 700 }}>
-          売上詳細を見る <ChevronRight size={14} />
-        </span>
-      </button>
+      </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
         <div
@@ -1452,7 +1467,7 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
 /* ---------------------------------------------------------
    売上履歴画面
 --------------------------------------------------------- */
-function HistoryScreen({ salesHistory, onBack, onSelectSale }) {
+function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
   const [mode, setMode] = useState("today"); // today | all | date
   const [dateValue, setDateValue] = useState(toDateInputValue(new Date().toISOString()));
 
@@ -1468,7 +1483,12 @@ function HistoryScreen({ salesHistory, onBack, onSelectSale }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Header title="売上履歴" onBack={onBack} />
+      <Header
+        title="売上履歴"
+        right={<HeaderIconButton icon={Settings} onClick={onOpenSettings} title="マスタ設定" />}
+      />
+
+      <HomeTabBar active={activeHomeTab} onSelect={onSelectHomeTab} />
 
       <div style={{ padding: "12px 20px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper }}>
         <button
@@ -1661,7 +1681,8 @@ function HistoryDetailScreen({ sale, onBack }) {
 function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [screen, setScreen] = useState("top"); // top | order | checkout | settings
+  const [screen, setScreen] = useState("top"); // top | order | checkout | settings | history | historyDetail | payroll
+  const [homeTab, setHomeTab] = useState("seats"); // seats | payroll | history
   const [activeSeat, setActiveSeat] = useState(null);
   const [guestModalSeat, setGuestModalSeat] = useState(null);
   const [selectedSaleId, setSelectedSaleId] = useState(null);
@@ -1725,6 +1746,15 @@ function App() {
       </div>
     );
   }
+
+  const handleSelectHomeTab = (tab) => {
+    setHomeTab(tab);
+    setScreen(tab === "seats" ? "top" : tab);
+  };
+
+  const onUpdatePayroll = (patch) => {
+    persist({ ...dataRef.current, payroll: { ...dataRef.current.payroll, ...patch } });
+  };
 
   const handleSelectSeat = (n) => {
     const seat = data.seats[n];
@@ -1811,7 +1841,8 @@ function App() {
           now={now}
           onSelectSeat={handleSelectSeat}
           onOpenSettings={() => setScreen("settings")}
-          onOpenHistory={() => setScreen("history")}
+          activeHomeTab={homeTab}
+          onSelectHomeTab={handleSelectHomeTab}
         />
       )}
 
@@ -1842,7 +1873,7 @@ function App() {
       {screen === "settings" && (
         <SettingsScreen
           data={data}
-          onBack={() => setScreen("top")}
+          onBack={() => setScreen(homeTab === "seats" ? "top" : homeTab)}
           onUpdateProducts={(list) => persist({ ...dataRef.current, products: list })}
           onUpdateSeatCount={(n) => persist({ ...dataRef.current, seatCount: n })}
           onUpdateRates={(service, tax) => persist({ ...dataRef.current, serviceChargeRate: service, taxRate: tax })}
@@ -1853,8 +1884,20 @@ function App() {
       {screen === "history" && (
         <HistoryScreen
           salesHistory={data.salesHistory}
-          onBack={() => setScreen("top")}
           onSelectSale={(id) => { setSelectedSaleId(id); setScreen("historyDetail"); }}
+          onOpenSettings={() => setScreen("settings")}
+          activeHomeTab={homeTab}
+          onSelectHomeTab={handleSelectHomeTab}
+        />
+      )}
+
+      {screen === "payroll" && (
+        <PayrollScreen
+          payroll={data.payroll}
+          onUpdatePayroll={onUpdatePayroll}
+          onOpenSettings={() => setScreen("settings")}
+          activeHomeTab={homeTab}
+          onSelectHomeTab={handleSelectHomeTab}
         />
       )}
 
@@ -1892,10 +1935,3 @@ function App() {
     </div>
   );
 }
-
-/* ---------------------------------------------------------
-   マウント
---------------------------------------------------------- */
-const rootEl = document.getElementById("root");
-const root = ReactDOM.createRoot(rootEl);
-root.render(React.createElement(App));
