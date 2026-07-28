@@ -307,6 +307,15 @@ function formatTimeShort(iso) {
   return `${h}:${min}`;
 }
 
+// CSVセル内にカンマ・改行・ダブルクォートが含まれる場合に備えたエスケープ
+function csvEscape(value) {
+  const str = value === null || value === undefined ? "" : String(value);
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 function paymentLabel(payments) {
   const names = { cash: "現金", card: "クレジット", paypay: "PayPay", onAccount: "売掛" };
   const used = Object.entries(payments || {}).filter(([, v]) => v > 0).map(([k]) => names[k] || k);
@@ -1166,14 +1175,15 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   };
 
   const exportSalesCsv = () => {
-    const rows = [["会計ID", "日時", "座席", "人数", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ"]];
+    const rows = [["会計ID", "日時", "座席", "人数", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
     (data.salesHistory || []).forEach((s) => {
       rows.push([
-        s.id, s.closedAt, s.seatNo, s.guestCount, s.subtotal, s.serviceAmount, s.taxAmount, s.total,
+        s.id, s.endTime, seatDisplayLabel(s.seatId, s.seatName), s.guests, s.subtotal, s.serviceCharge, s.tax, s.total,
         s.payments?.cash || 0, s.payments?.card || 0, s.payments?.paypay || 0, s.payments?.onAccount || 0,
+        s.memo || "",
       ]);
     });
-    const csv = rows.map((r) => r.join(",")).join("\r\n");
+    const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\r\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
