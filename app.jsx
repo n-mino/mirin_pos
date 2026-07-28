@@ -202,6 +202,11 @@ function seatHeaderTitle(n, seatName) {
   return seatName ? `座席 ${n}(${seatName})` : `座席 ${n}`;
 }
 
+// 座席名が設定されていれば名前のみ、なければ番号にフォールバック
+function seatDisplayLabel(n, seatName) {
+  return seatName || `座席 ${n}`;
+}
+
 function formatElapsed(startIso, nowMs) {
   const start = new Date(startIso).getTime();
   const diff = Math.max(0, nowMs - start);
@@ -569,21 +574,27 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                     backgroundImage: `repeating-linear-gradient(90deg, ${COLORS.line} 0 5px, transparent 5px 10px)`,
                   }}
                 />
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: DISPLAY, fontSize: 26, fontWeight: 700, color: COLORS.ink }}>
-                    {n}
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                  <span
+                    style={{
+                      fontFamily: DISPLAY,
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: COLORS.ink,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                  >
+                    {seatDisplayLabel(n, seatName)}
                   </span>
                   {occupied && (
-                    <span style={{ fontSize: 11, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
+                    <span style={{ fontSize: 11, fontFamily: MONO, color: tone.fg, fontWeight: 700, flexShrink: 0 }}>
                       ● 使用中
                     </span>
                   )}
                 </div>
-                {seatName && (
-                  <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: -6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {seatName}
-                  </div>
-                )}
                 {occupied ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: COLORS.inkSoft }}>
@@ -1696,7 +1707,7 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
                   {formatDateTimeShort(s.endTime)}
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>
-                  {seatHeaderTitle(s.seatId, s.seatName)} <span style={{ fontWeight: 400, color: COLORS.inkSoft, fontSize: 12.5 }}>・ {s.guests}名</span>
+                  {seatDisplayLabel(s.seatId, s.seatName)} <span style={{ fontWeight: 400, color: COLORS.inkSoft, fontSize: 12.5 }}>・ {s.guests}名</span>
                 </div>
                 <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{paymentLabel(s.payments)}</div>
                 {s.memo && (
