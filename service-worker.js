@@ -1,5 +1,5 @@
 // このバージョン番号を上げると、次回オンライン時に新しいキャッシュへ切り替わる
-const CACHE_VERSION = "pos-app-cache-v5";
+const CACHE_VERSION = "pos-app-cache-v6";
 
 // アプリの動作に必要な全ファイル(App Shell)
 // CDNのReact/Babelも含めてキャッシュし、完全オフラインで起動できるようにする
@@ -21,10 +21,13 @@ const APP_SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => {
-      // CDNリソースはno-corsで取得(opaqueレスポンスでもキャッシュ自体は可能)
+      // CDN(unpkg)はCORSに対応しているため、ページ側の<script crossorigin>と
+      // 同じ既定モード(cors)で取得する。no-corsで取得するとopaqueレスポンスに
+      // なり、後続の実リクエスト(corsモード)に対して返した際にモード不一致の
+      // ネットワークエラーとなり、React本体が読み込めなくなってしまうため。
       return Promise.all(
         APP_SHELL.map((url) =>
-          fetch(url, { mode: url.startsWith("http") ? "no-cors" : "same-origin" })
+          fetch(url)
             .then((res) => cache.put(url, res))
             .catch(() => {
               // 初回インストール時にオフラインだと失敗するファイルがあってもインストール自体は続行する
@@ -52,6 +55,7 @@ self.addEventListener("activate", (event) => {
 // キャッシュファースト戦略: あればキャッシュから即返し、裏側で更新を試みる(stale-while-revalidate)
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (!event.request.url.startsWith("http")) return; // chrome-extension: 等はSWの対象外
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
