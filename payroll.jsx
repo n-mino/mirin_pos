@@ -36,7 +36,7 @@ function payrollShiftTotal(shift, employees) {
   const wage = emp ? emp.hourlyWage : 0;
   const minutes = payrollShiftMinutes(shift.startTime, shift.endTime);
   const hours = minutes === null ? 0 : minutes / 60;
-  return { hours, total: hours * wage + (shift.option || 0) };
+  return { hours, total: hours * wage + (shift.option || 0) + (shift.option2 || 0) };
 }
 
 function payrollPeriodKey(dateStr, period) {
@@ -202,22 +202,25 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
     startTime: "",
     endTime: "",
     option: "0",
+    option2: "0",
     note: "",
   });
 
-  const [form, setForm] = useState(() =>
-    editingShift
-      ? { employeeId: editingShift.employeeId, date: editingShift.date, startTime: editingShift.startTime, endTime: editingShift.endTime, option: String(editingShift.option || 0), note: editingShift.note || "" }
-      : blank()
-  );
+  const fromShift = (s) => ({
+    employeeId: s.employeeId,
+    date: s.date,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    option: String(s.option || 0),
+    option2: String(s.option2 || 0),
+    note: s.note || "",
+  });
+
+  const [form, setForm] = useState(() => (editingShift ? fromShift(editingShift) : blank()));
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setForm(
-      editingShift
-        ? { employeeId: editingShift.employeeId, date: editingShift.date, startTime: editingShift.startTime, endTime: editingShift.endTime, option: String(editingShift.option || 0), note: editingShift.note || "" }
-        : blank()
-    );
+    setForm(editingShift ? fromShift(editingShift) : blank());
     setError("");
   }, [editingShift]);
 
@@ -241,6 +244,7 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
       startTime: form.startTime,
       endTime: form.endTime,
       option: Math.max(0, Number(form.option) || 0),
+      option2: Math.max(0, Number(form.option2) || 0),
       note: form.note.trim(),
     });
     if (!editingShift) setForm(blank());
@@ -254,7 +258,7 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
 
       {employees.length === 0 ? (
         <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "20px 0", textAlign: "center" }}>
-          先に「アルバイト」タブでスタッフを登録してください。
+          先に「アルバイトマスタ」タブでスタッフを登録してください。
         </div>
       ) : (
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -283,9 +287,15 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
             </div>
           </div>
 
-          <div>
-            <label style={{ fontSize: 12, color: COLORS.inkSoft }}>オプション金額(円)</label>
-            <input type="number" min="0" value={form.option} onChange={(e) => setField("option", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, color: COLORS.inkSoft }}>オプション金額１(円)</label>
+              <input type="number" min="0" value={form.option} onChange={(e) => setField("option", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, color: COLORS.inkSoft }}>オプション金額２(円)</label>
+              <input type="number" min="0" value={form.option2} onChange={(e) => setField("option2", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+            </div>
           </div>
 
           <div>
@@ -317,7 +327,7 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
    勤怠一覧
 --------------------------------------------------------- */
 function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
-  const [viewMode, setViewMode] = useState("individual"); // individual | all
+  const [viewMode, setViewMode] = useState("all"); // individual | all
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(employees[0]?.id || "");
   const [deletingShiftId, setDeletingShiftId] = useState(null);
 
@@ -368,7 +378,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ fontSize: 12, color: COLORS.inkSoft, fontFamily: MONO, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {shift.startTime}-{shift.endTime}({formatHours(hours)}){shift.option > 0 ? ` ・オプション ${formatYen(shift.option)}` : ""}{shift.note ? ` ・${shift.note}` : ""}
+                    {shift.startTime}-{shift.endTime}({formatHours(hours)}){shift.option > 0 ? ` ・オプション１ ${formatYen(shift.option)}` : ""}{shift.option2 > 0 ? ` ・オプション２ ${formatYen(shift.option2)}` : ""}{shift.note ? ` ・${shift.note}` : ""}
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     <button onClick={() => onEdit(shift.id)} style={payrollIconBtnStyle}>
@@ -545,7 +555,7 @@ function AggregationTable({ periodKeys, map, activeEmployees, scope }) {
 
 function AggregationPanel({ employees, shifts }) {
   const [period, setPeriod] = useState("monthly"); // monthly | yearly
-  const [scope, setScope] = useState("individual"); // individual | all
+  const [scope, setScope] = useState("all"); // individual | all
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(employees[0]?.id || "");
 
   useEffect(() => {
@@ -625,14 +635,14 @@ function AggregationPanel({ employees, shifts }) {
    アルバイト管理画面(トップレベル)
 --------------------------------------------------------- */
 const PAYROLL_TABS = [
-  { id: "employees", label: "アルバイト" },
   { id: "entry", label: "勤怠入力" },
   { id: "list", label: "勤怠一覧" },
   { id: "agg", label: "集計" },
+  { id: "employees", label: "アルバイトマスタ" },
 ];
 
 function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
-  const [tab, setTab] = useState("employees");
+  const [tab, setTab] = useState(PAYROLL_TABS[0].id);
   const [editingEmployee, setEditingEmployee] = useState(null); // null | {} | employee
   const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
   const [editingShiftId, setEditingShiftId] = useState(null);

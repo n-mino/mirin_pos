@@ -179,8 +179,9 @@ const DEFAULT_PRODUCTS = [
 function defaultData() {
   return {
     products: DEFAULT_PRODUCTS,
-    seatCount: 12,
+    seatCount: 5,
     seats: {},
+    seatNames: {},
     salesHistory: [],
     serviceChargeRate: 0, // %
     taxRate: 10, // %
@@ -194,6 +195,11 @@ function uid(prefix = "id") {
 
 function formatYen(n) {
   return `¥${Math.round(n).toLocaleString("ja-JP")}`;
+}
+
+// 座席番号に加え、設定されていれば座席名も併記する
+function seatHeaderTitle(n, seatName) {
+  return seatName ? `座席 ${n}(${seatName})` : `座席 ${n}`;
 }
 
 function formatElapsed(startIso, nowMs) {
@@ -423,8 +429,8 @@ function HeaderIconButton({ icon: Icon, onClick, title }) {
 
 const HOME_TABS = [
   { id: "seats", label: "座席一覧" },
-  { id: "payroll", label: "アルバイト管理" },
   { id: "history", label: "売上履歴" },
+  { id: "payroll", label: "アルバイト管理" },
 ];
 
 function HomeTabBar({ active, onSelect }) {
@@ -532,6 +538,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
             const mins = occupied ? elapsedMinutes(seat.startTime, now) : 0;
             const tone = occupied ? seatTone(mins) : { fg: COLORS.inkSoft, bg: COLORS.paper };
             const total = occupied ? seatOrderTotal(seat) : 0;
+            const seatName = data.seatNames?.[n];
 
             return (
               <button
@@ -572,6 +579,11 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                     </span>
                   )}
                 </div>
+                {seatName && (
+                  <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: -6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {seatName}
+                  </div>
+                )}
                 {occupied ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: COLORS.inkSoft }}>
@@ -732,7 +744,7 @@ function ConfirmModal({ title, message, confirmLabel = "OK", onConfirm, onCancel
 /* ---------------------------------------------------------
    注文画面
 --------------------------------------------------------- */
-function OrderScreen({ seatNum, seat, products, now, onUpdateOrders, onBack, onGoCheckout, onCancelSeat }) {
+function OrderScreen({ seatNum, seatName, seat, products, now, onUpdateOrders, onBack, onGoCheckout, onCancelSeat }) {
   const categories = Array.from(new Set(products.map((p) => p.category)));
   const [activeCat, setActiveCat] = useState(categories[0] || "");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -761,7 +773,7 @@ function OrderScreen({ seatNum, seat, products, now, onUpdateOrders, onBack, onG
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header
-        title={`座席 ${seatNum}`}
+        title={seatHeaderTitle(seatNum, seatName)}
         onBack={onBack}
         right={
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: MONO, fontSize: 12 }}>
@@ -934,6 +946,7 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
   const [card, setCard] = useState("");
   const [paypay, setPaypay] = useState("");
   const [onAccount, setOnAccount] = useState("");
+  const [memo, setMemo] = useState("");
 
   const cashN = Math.max(0, Number(cash) || 0);
   const cardN = Math.max(0, Number(card) || 0);
@@ -953,7 +966,7 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Header title={`会計 - 座席 ${seatNum}`} onBack={onBack} />
+      <Header title={`会計 - ${seatHeaderTitle(seatNum, data.seatNames?.[seatNum])}`} onBack={onBack} />
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 18 }}>
@@ -1032,6 +1045,28 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
             </div>
           ))}
 
+          <div style={{ marginTop: 4, marginBottom: 4 }}>
+            <label style={{ fontSize: 12, color: COLORS.inkSoft }}>メモ(任意)</label>
+            <textarea
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="伝票メモなど"
+              rows={2}
+              style={{
+                width: "100%",
+                padding: "9px 10px",
+                borderRadius: 6,
+                border: `1.5px solid ${COLORS.line}`,
+                marginTop: 4,
+                fontSize: 13.5,
+                fontFamily: SANS,
+                background: COLORS.paper,
+                color: COLORS.ink,
+                resize: "vertical",
+              }}
+            />
+          </div>
+
           <div
             style={{
               display: "flex",
@@ -1053,7 +1088,7 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
         <TicketButton
           variant="primary"
           disabled={!canConfirm}
-          onClick={() => onConfirm({ cash: cashN, card: cardN, paypay: paypayN, onAccount: onAccountN }, bill)}
+          onClick={() => onConfirm({ cash: cashN, card: cardN, paypay: paypayN, onAccount: onAccountN }, bill, memo.trim())}
           style={{ width: "100%", padding: "14px 18px" }}
           icon={Check}
         >
@@ -1064,19 +1099,48 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
   );
 }
 
+function SeatNameInput({ initialValue, onSave }) {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => setValue(initialValue), [initialValue]);
+
+  const commit = () => {
+    const trimmed = value.trim();
+    if (trimmed !== (initialValue || "")) onSave(trimmed);
+  };
+
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      placeholder="座席名(任意)"
+      style={{
+        width: "100%",
+        padding: "7px 10px",
+        borderRadius: 6,
+        border: `1.5px solid ${COLORS.line}`,
+        fontSize: 13,
+        background: COLORS.paper,
+        color: COLORS.ink,
+      }}
+    />
+  );
+}
+
 /* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
-function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateRates, onImportData }) {
+function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData }) {
   const [tab, setTab] = useState("products");
   const [editing, setEditing] = useState(null); // product being edited, or {} for new
-  const [seatInput, setSeatInput] = useState(String(data.seatCount));
   const [serviceInput, setServiceInput] = useState(String(data.serviceChargeRate ?? 0));
   const [taxInput, setTaxInput] = useState(String(data.taxRate ?? 0));
   const [importError, setImportError] = useState("");
   const [importOk, setImportOk] = useState("");
   const fileInputRef = useRef(null);
-  const occupiedMax = Math.max(0, ...Object.keys(data.seats).map(Number));
 
   const exportData = () => {
     const payload = {
@@ -1156,10 +1220,13 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
     onUpdateProducts(data.products.filter((p) => p.id !== id));
   };
 
-  const applySeatCount = () => {
-    const n = Math.max(1, Math.min(200, Number(seatInput) || 1));
-    if (n < occupiedMax) return;
-    onUpdateSeatCount(n);
+  const addSeat = () => {
+    onUpdateSeatCount(Math.min(200, data.seatCount + 1));
+  };
+
+  const removeLastSeat = () => {
+    if (data.seats[data.seatCount]) return; // 使用中は削除不可
+    onUpdateSeatCount(Math.max(1, data.seatCount - 1));
   };
 
   const applyRates = () => {
@@ -1241,23 +1308,66 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
         )}
 
         {tab === "seats" && (
-          <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20 }}>
-            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginBottom: 10 }}>座席数(1〜200)</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <input
-                type="number"
-                value={seatInput}
-                onChange={(e) => setSeatInput(e.target.value)}
-                style={{ flex: 1, padding: "10px 12px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, fontFamily: MONO, fontSize: 16 }}
-              />
-              <TicketButton variant="primary" onClick={applySeatCount}>保存</TicketButton>
+          <>
+            <TicketButton variant="primary" onClick={addSeat} icon={Plus} disabled={data.seatCount >= 200} style={{ marginBottom: 16 }}>
+              座席を追加
+            </TicketButton>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {Array.from({ length: data.seatCount }, (_, i) => i + 1).map((n) => {
+                const occupied = !!data.seats[n];
+                const isLast = n === data.seatCount;
+                return (
+                  <div
+                    key={n}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      background: COLORS.paper,
+                      border: `1.5px solid ${COLORS.line}`,
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>座席 {n}</div>
+                        {occupied && (
+                          <div style={{ fontSize: 12, color: COLORS.brick, fontFamily: MONO }}>使用中</div>
+                        )}
+                      </div>
+                      {isLast && (
+                        <button
+                          onClick={removeLastSeat}
+                          disabled={occupied || data.seatCount <= 1}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 6,
+                            border: `1px solid ${COLORS.brick}`,
+                            background: "transparent",
+                            cursor: occupied || data.seatCount <= 1 ? "not-allowed" : "pointer",
+                            opacity: occupied || data.seatCount <= 1 ? 0.4 : 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: COLORS.brick,
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <SeatNameInput
+                      seatNum={n}
+                      initialValue={data.seatNames?.[n] || ""}
+                      onSave={(name) => onUpdateSeatName(n, name)}
+                    />
+                  </div>
+                );
+              })}
             </div>
-            {Number(seatInput) < occupiedMax && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, color: COLORS.brick, fontSize: 12.5, marginTop: 10 }}>
-                <AlertCircle size={14} /> 使用中の座席番号（最大{occupiedMax}）より小さくはできません
-              </div>
-            )}
-          </div>
+          </>
         )}
 
         {tab === "rates" && (
@@ -1586,9 +1696,14 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
                   {formatDateTimeShort(s.endTime)}
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>
-                  座席 {s.seatId} <span style={{ fontWeight: 400, color: COLORS.inkSoft, fontSize: 12.5 }}>・ {s.guests}名</span>
+                  {seatHeaderTitle(s.seatId, s.seatName)} <span style={{ fontWeight: 400, color: COLORS.inkSoft, fontSize: 12.5 }}>・ {s.guests}名</span>
                 </div>
                 <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{paymentLabel(s.payments)}</div>
+                {s.memo && (
+                  <div style={{ fontSize: 12, color: COLORS.inkSoft, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260 }}>
+                    {s.memo}
+                  </div>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontFamily: MONO, fontSize: 17, fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</span>
@@ -1608,7 +1723,7 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
 function HistoryDetailScreen({ sale, onBack }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Header title={`会計明細 - 座席 ${sale.seatId}`} onBack={onBack} />
+      <Header title={`会計明細 - ${seatHeaderTitle(sale.seatId, sale.seatName)}`} onBack={onBack} />
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 18 }}>
@@ -1670,6 +1785,15 @@ function HistoryDetailScreen({ sale, onBack }) {
             )}
           </div>
         </div>
+
+        {sale.memo && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>メモ</div>
+            <div style={{ background: COLORS.paper, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: COLORS.ink, whiteSpace: "pre-wrap" }}>
+              {sale.memo}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1791,12 +1915,13 @@ function App() {
     showToast(`座席${n} を取り消しました`);
   };
 
-  const handleCheckoutConfirm = (payments, bill) => {
+  const handleCheckoutConfirm = (payments, bill, memo) => {
     const n = activeSeat;
     const seat = dataRef.current.seats[n];
     const record = {
       id: uid("sale"),
       seatId: n,
+      seatName: dataRef.current.seatNames?.[n] || "",
       guests: seat.guests,
       startTime: seat.startTime,
       endTime: new Date().toISOString(),
@@ -1808,6 +1933,7 @@ function App() {
       tax: bill.tax,
       total: bill.total,
       payments,
+      memo: memo || "",
     };
     const newSeats = { ...dataRef.current.seats };
     delete newSeats[n];
@@ -1849,6 +1975,7 @@ function App() {
       {screen === "order" && seat && (
         <OrderScreen
           seatNum={activeSeat}
+          seatName={data.seatNames?.[activeSeat]}
           seat={seat}
           products={data.products}
           now={now}
@@ -1876,6 +2003,7 @@ function App() {
           onBack={() => setScreen(homeTab === "seats" ? "top" : homeTab)}
           onUpdateProducts={(list) => persist({ ...dataRef.current, products: list })}
           onUpdateSeatCount={(n) => persist({ ...dataRef.current, seatCount: n })}
+          onUpdateSeatName={(n, name) => persist({ ...dataRef.current, seatNames: { ...dataRef.current.seatNames, [n]: name } })}
           onUpdateRates={(service, tax) => persist({ ...dataRef.current, serviceChargeRate: service, taxRate: tax })}
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
         />
