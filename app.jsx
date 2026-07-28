@@ -197,11 +197,6 @@ function formatYen(n) {
   return `¥${Math.round(n).toLocaleString("ja-JP")}`;
 }
 
-// 座席番号に加え、設定されていれば座席名も併記する
-function seatHeaderTitle(n, seatName) {
-  return seatName ? `座席 ${n}(${seatName})` : `座席 ${n}`;
-}
-
 // 座席名が設定されていれば名前のみ、なければ番号にフォールバック
 function seatDisplayLabel(n, seatName) {
   return seatName || `座席 ${n}`;
@@ -574,23 +569,22 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                     backgroundImage: `repeating-linear-gradient(90deg, ${COLORS.line} 0 5px, transparent 5px 10px)`,
                   }}
                 />
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <span
                     style={{
                       fontFamily: DISPLAY,
-                      fontSize: 22,
+                      fontSize: 16,
                       fontWeight: 700,
                       color: COLORS.ink,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                      minWidth: 0,
                     }}
                   >
                     {seatDisplayLabel(n, seatName)}
                   </span>
                   {occupied && (
-                    <span style={{ fontSize: 11, fontFamily: MONO, color: tone.fg, fontWeight: 700, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
                       ● 使用中
                     </span>
                   )}
@@ -784,7 +778,7 @@ function OrderScreen({ seatNum, seatName, seat, products, now, onUpdateOrders, o
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header
-        title={seatHeaderTitle(seatNum, seatName)}
+        title={seatDisplayLabel(seatNum, seatName)}
         onBack={onBack}
         right={
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: MONO, fontSize: 12 }}>
@@ -977,7 +971,7 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Header title={`会計 - ${seatHeaderTitle(seatNum, data.seatNames?.[seatNum])}`} onBack={onBack} />
+      <Header title={`会計 - ${seatDisplayLabel(seatNum, data.seatNames?.[seatNum])}`} onBack={onBack} />
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 18 }}>
@@ -1734,7 +1728,7 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
 function HistoryDetailScreen({ sale, onBack }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Header title={`会計明細 - ${seatHeaderTitle(sale.seatId, sale.seatName)}`} onBack={onBack} />
+      <Header title={`会計明細 - ${seatDisplayLabel(sale.seatId, sale.seatName)}`} onBack={onBack} />
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 18 }}>
