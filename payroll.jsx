@@ -102,6 +102,42 @@ const payrollFieldInputStyle = {
   color: COLORS.ink,
 };
 
+const PAYROLL_TIME_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const PAYROLL_TIME_MINUTES = ["00", "15", "30", "45"];
+
+// ネイティブ<input type="time">はOS/ブラウザによってstepの分刻み制限が
+// 効かない(自由に分を入力・選択できてしまう)ため、時・分を別セレクトにして
+// 15分単位以外を選べないようにする
+function TimeStepSelect({ value, onChange }) {
+  const [h, m] = (value || "").split(":");
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+      <select
+        value={h || ""}
+        onChange={(e) => onChange(`${e.target.value}:${m || "00"}`)}
+        style={{ ...payrollFieldInputStyle, width: "auto", flex: 1, marginTop: 0, fontFamily: MONO }}
+      >
+        <option value="" disabled>時</option>
+        {PAYROLL_TIME_HOURS.map((hh) => (
+          <option key={hh} value={hh}>{hh}</option>
+        ))}
+      </select>
+      <span style={{ color: COLORS.inkSoft }}>:</span>
+      <select
+        value={m || ""}
+        onChange={(e) => onChange(`${h || "00"}:${e.target.value}`)}
+        style={{ ...payrollFieldInputStyle, width: "auto", flex: 1, marginTop: 0, fontFamily: MONO }}
+      >
+        <option value="" disabled>分</option>
+        {PAYROLL_TIME_MINUTES.map((mm) => (
+          <option key={mm} value={mm}>{mm}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------
    アルバイト管理
 --------------------------------------------------------- */
@@ -283,12 +319,12 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
 
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12, color: COLORS.inkSoft }}>開始時刻</label>
-              <input type="time" step={900} value={form.startTime} onChange={(e) => setField("startTime", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+              <label style={{ fontSize: 12, color: COLORS.inkSoft }}>開始時刻(15分単位)</label>
+              <TimeStepSelect value={form.startTime} onChange={(v) => setField("startTime", v)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12, color: COLORS.inkSoft }}>終了時刻</label>
-              <input type="time" step={900} value={form.endTime} onChange={(e) => setField("endTime", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+              <label style={{ fontSize: 12, color: COLORS.inkSoft }}>終了時刻(15分単位)</label>
+              <TimeStepSelect value={form.endTime} onChange={(v) => setField("endTime", v)} />
             </div>
           </div>
 
