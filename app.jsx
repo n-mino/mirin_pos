@@ -185,6 +185,7 @@ function defaultData() {
     serviceChargeRate: 0, // %
     taxRate: 10, // %
     payroll: { employees: [], shifts: [] },
+    cashFlow: { records: {} }, // 日付(YYYY-MM-DD) -> { expenses:[], income:[] }
   };
 }
 
@@ -436,6 +437,7 @@ function HeaderIconButton({ icon: Icon, onClick, title }) {
 const HOME_TABS = [
   { id: "seats", label: "座席一覧" },
   { id: "history", label: "売上履歴" },
+  { id: "cashflow", label: "入出金管理" },
   { id: "payroll", label: "アルバイト管理" },
 ];
 
@@ -1853,8 +1855,8 @@ function HistoryDetailScreen({ sale, onBack }) {
 function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [screen, setScreen] = useState("top"); // top | order | checkout | settings | history | historyDetail | payroll
-  const [homeTab, setHomeTab] = useState("seats"); // seats | payroll | history
+  const [screen, setScreen] = useState("top"); // top | order | checkout | settings | history | historyDetail | cashflow | payroll
+  const [homeTab, setHomeTab] = useState("seats"); // seats | history | cashflow | payroll
   const [activeSeat, setActiveSeat] = useState(null);
   const [guestModalSeat, setGuestModalSeat] = useState(null);
   const [selectedSaleId, setSelectedSaleId] = useState(null);
@@ -1926,6 +1928,13 @@ function App() {
 
   const onUpdatePayroll = (patch) => {
     persist({ ...dataRef.current, payroll: { ...dataRef.current.payroll, ...patch } });
+  };
+
+  const onUpdateCashFlow = (date, record) => {
+    persist({
+      ...dataRef.current,
+      cashFlow: { records: { ...dataRef.current.cashFlow.records, [date]: record } },
+    });
   };
 
   const handleSelectSeat = (n) => {
@@ -2061,6 +2070,16 @@ function App() {
         <HistoryScreen
           salesHistory={data.salesHistory}
           onSelectSale={(id) => { setSelectedSaleId(id); setScreen("historyDetail"); }}
+          onOpenSettings={() => setScreen("settings")}
+          activeHomeTab={homeTab}
+          onSelectHomeTab={handleSelectHomeTab}
+        />
+      )}
+
+      {screen === "cashflow" && (
+        <CashFlowScreen
+          cashFlow={data.cashFlow}
+          onUpdateCashFlow={onUpdateCashFlow}
           onOpenSettings={() => setScreen("settings")}
           activeHomeTab={homeTab}
           onSelectHomeTab={handleSelectHomeTab}
