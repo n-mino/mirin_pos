@@ -299,18 +299,8 @@ function formatDateTimeShort(iso) {
   return `${m}/${day} ${h}:${min}`;
 }
 
-function formatDateTimeFull(iso) {
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${y}/${m}/${day} ${h}:${min}`;
-}
-
 function formatDateTimeRange(startIso, endIso) {
-  return `${formatDateTimeFull(startIso)} ～ ${formatDateTimeFull(endIso)}`;
+  return `${formatDateTimeShort(startIso)} ～ ${formatDateTimeShort(endIso)}`;
 }
 
 function formatTimeShort(iso) {
@@ -1599,7 +1589,7 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
 /* ---------------------------------------------------------
    売上履歴画面
 --------------------------------------------------------- */
-const HISTORY_TABLE_COLS = "220px 110px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
+const HISTORY_TABLE_COLS = "170px 110px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
 
 function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
   const [mode, setMode] = useState("today"); // today | all | date
@@ -1700,7 +1690,7 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
         )}
         {filtered.length > 0 && (
           <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 1280 }}>
+            <div style={{ minWidth: 1230 }}>
               <div
                 style={{
                   display: "grid",
@@ -1719,7 +1709,7 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
                 <div>小計</div>
                 <div>サービス料</div>
                 <div>消費税</div>
-                <div>合計</div>
+                <div style={{ background: COLORS.sageBg, color: COLORS.teal, borderRadius: 6, padding: "2px 8px", margin: "-2px 0" }}>合計</div>
                 <div>現金</div>
                 <div>カード</div>
                 <div>PayPay</div>
@@ -1757,7 +1747,9 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
                   <div>{formatYen(s.subtotal)}</div>
                   <div>{formatYen(s.serviceCharge)}</div>
                   <div>{formatYen(s.tax)}</div>
-                  <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
+                  <div style={{ fontWeight: 700, color: COLORS.teal, background: COLORS.sageBg, borderRadius: 6, padding: "2px 8px", margin: "-2px 0" }}>
+                    {formatYen(s.total)}
+                  </div>
                   <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
                   <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
                   <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>

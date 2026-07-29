@@ -36,7 +36,9 @@ function payrollShiftTotal(shift, employees) {
   const wage = emp ? emp.hourlyWage : 0;
   const minutes = payrollShiftMinutes(shift.startTime, shift.endTime);
   const hours = minutes === null ? 0 : minutes / 60;
-  return { hours, total: hours * wage + (shift.option || 0) + (shift.option2 || 0) };
+  const dailyWage = shift.dailyWage || 0;
+  const base = dailyWage > 0 ? dailyWage : hours * wage;
+  return { hours, total: base + (shift.option || 0) + (shift.option2 || 0) };
 }
 
 function payrollPeriodKey(dateStr, period) {
@@ -201,6 +203,7 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
     date: toDateInputValue(new Date().toISOString()),
     startTime: "",
     endTime: "",
+    dailyWage: "0",
     option: "0",
     option2: "0",
     note: "",
@@ -211,6 +214,7 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
     date: s.date,
     startTime: s.startTime,
     endTime: s.endTime,
+    dailyWage: String(s.dailyWage || 0),
     option: String(s.option || 0),
     option2: String(s.option2 || 0),
     note: s.note || "",
@@ -243,6 +247,7 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
       date: form.date,
       startTime: form.startTime,
       endTime: form.endTime,
+      dailyWage: Math.max(0, Number(form.dailyWage) || 0),
       option: Math.max(0, Number(form.option) || 0),
       option2: Math.max(0, Number(form.option2) || 0),
       note: form.note.trim(),
@@ -279,11 +284,19 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 12, color: COLORS.inkSoft }}>開始時刻</label>
-              <input type="time" value={form.startTime} onChange={(e) => setField("startTime", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+              <input type="time" step={900} value={form.startTime} onChange={(e) => setField("startTime", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 12, color: COLORS.inkSoft }}>終了時刻</label>
-              <input type="time" value={form.endTime} onChange={(e) => setField("endTime", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+              <input type="time" step={900} value={form.endTime} onChange={(e) => setField("endTime", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, color: COLORS.inkSoft }}>日給(円・任意)</label>
+            <input type="number" min="0" value={form.dailyWage} onChange={(e) => setField("dailyWage", e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>
+              値を入力すると、時間による計算の代わりに日給が使用されます
             </div>
           </div>
 
@@ -326,6 +339,8 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
 /* ---------------------------------------------------------
    勤怠一覧
 --------------------------------------------------------- */
+const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 80px 80px 90px 140px 70px";
+
 function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(employees[0]?.id || "");
@@ -364,34 +379,73 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
           勤怠記録がまだありません。
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {list.map((shift) => {
-            const emp = employees.find((e) => e.id === shift.employeeId);
-            const { hours, total } = payrollShiftTotal(shift, employees);
-            return (
-              <div key={shift.id} style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 8, padding: "12px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, gap: 8 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {emp ? emp.name : "(削除済み)"} <span style={{ fontWeight: 400, color: COLORS.inkSoft, fontSize: 12.5, fontFamily: MONO }}>・ {shift.date}</span>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: 910 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: SHIFT_TABLE_COLS,
+                gap: 4,
+                padding: "8px 10px",
+                borderBottom: `1px solid ${COLORS.line}`,
+                fontSize: 11.5,
+                color: COLORS.inkSoft,
+                fontWeight: 700,
+              }}
+            >
+              <div>日付</div>
+              <div>従業員</div>
+              <div>時間</div>
+              <div>勤務時間</div>
+              <div>日給</div>
+              <div>オプション１</div>
+              <div>オプション２</div>
+              <div>合計</div>
+              <div>メモ</div>
+              <div>操作</div>
+            </div>
+            {list.map((shift) => {
+              const emp = employees.find((e) => e.id === shift.employeeId);
+              const { hours, total } = payrollShiftTotal(shift, employees);
+              return (
+                <div
+                  key={shift.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: SHIFT_TABLE_COLS,
+                    gap: 4,
+                    padding: "8px 10px",
+                    borderBottom: `1px dashed ${COLORS.line}`,
+                    fontSize: 12.5,
+                    fontFamily: MONO,
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ fontFamily: SANS, color: COLORS.ink }}>{shift.date}</div>
+                  <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {emp ? emp.name : "(削除済み)"}
                   </div>
-                  <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, color: COLORS.teal, flexShrink: 0 }}>{formatYen(total)}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ fontSize: 12, color: COLORS.inkSoft, fontFamily: MONO, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {shift.startTime}-{shift.endTime}({formatHours(hours)}){shift.option > 0 ? ` ・オプション１ ${formatYen(shift.option)}` : ""}{shift.option2 > 0 ? ` ・オプション２ ${formatYen(shift.option2)}` : ""}{shift.note ? ` ・${shift.note}` : ""}
+                  <div>{shift.startTime}-{shift.endTime}</div>
+                  <div>{formatHours(hours)}</div>
+                  <div>{shift.dailyWage > 0 ? formatYen(shift.dailyWage) : "-"}</div>
+                  <div>{shift.option > 0 ? formatYen(shift.option) : "-"}</div>
+                  <div>{shift.option2 > 0 ? formatYen(shift.option2) : "-"}</div>
+                  <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(total)}</div>
+                  <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {shift.note || ""}
                   </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => onEdit(shift.id)} style={payrollIconBtnStyle}>
-                      <Pencil size={14} />
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => onEdit(shift.id)} style={{ ...payrollIconBtnStyle, width: 26, height: 26 }}>
+                      <Pencil size={12} />
                     </button>
-                    <button onClick={() => setDeletingShiftId(shift.id)} style={{ ...payrollIconBtnStyle, border: `1px solid ${COLORS.brick}`, color: COLORS.brick }}>
-                      <Trash2 size={14} />
+                    <button onClick={() => setDeletingShiftId(shift.id)} style={{ ...payrollIconBtnStyle, width: 26, height: 26, border: `1px solid ${COLORS.brick}`, color: COLORS.brick }}>
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
