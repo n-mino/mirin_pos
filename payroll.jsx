@@ -375,7 +375,7 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
 /* ---------------------------------------------------------
    勤怠一覧
 --------------------------------------------------------- */
-const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 80px 80px 90px 140px 70px";
+const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 80px 80px 80px 90px 140px 70px";
 
 function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
@@ -416,7 +416,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 910 }}>
+          <div style={{ minWidth: 990 }}>
             <div
               style={{
                 display: "grid",
@@ -433,6 +433,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
               <div>従業員</div>
               <div>時間</div>
               <div>勤務時間</div>
+              <div>時給</div>
               <div>日給</div>
               <div>オプション１</div>
               <div>オプション２</div>
@@ -463,6 +464,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
                   </div>
                   <div>{shift.startTime}-{shift.endTime}</div>
                   <div>{formatHours(hours)}</div>
+                  <div>{emp ? formatYen(emp.hourlyWage) : "-"}</div>
                   <div>{shift.dailyWage > 0 ? formatYen(shift.dailyWage) : "-"}</div>
                   <div>{shift.option > 0 ? formatYen(shift.option) : "-"}</div>
                   <div>{shift.option2 > 0 ? formatYen(shift.option2) : "-"}</div>
