@@ -440,31 +440,43 @@ function DailySummaryPanel({ data }) {
         </div>
       </div>
 
-      <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 10, background: COLORS.paper, padding: 16, maxWidth: 460, marginBottom: 24 }}>
-        {summaryRows.map((row) => (
-          <div
-            key={row.label}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "7px 0",
-              borderBottom: `1px dashed ${COLORS.line}`,
-              fontSize: row.highlight ? 14 : 13,
-              color: row.highlight ? COLORS.ink : COLORS.inkSoft,
-              fontWeight: row.highlight ? 700 : 400,
-            }}
-          >
-            <span>{row.label}</span>
-            <span style={{ fontFamily: MONO, color: row.highlight ? COLORS.teal : COLORS.ink, fontWeight: row.highlight ? 700 : 400 }}>
-              {formatYen(row.value)}
+      <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 20, marginBottom: 24 }}>
+        <div style={{ flex: "1.2 1 0", minWidth: 0, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, background: COLORS.paper, padding: 16 }}>
+          {summaryRows.map((row) => (
+            <div
+              key={row.label}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "7px 0",
+                borderBottom: `1px dashed ${COLORS.line}`,
+                fontSize: row.highlight ? 14 : 13,
+                color: row.highlight ? COLORS.ink : COLORS.inkSoft,
+                fontWeight: row.highlight ? 700 : 400,
+              }}
+            >
+              <span>{row.label}</span>
+              <span style={{ fontFamily: MONO, color: row.highlight ? COLORS.teal : COLORS.ink, fontWeight: row.highlight ? 700 : 400 }}>
+                {formatYen(row.value)}
+              </span>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, marginTop: 4 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>残金</span>
+            <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color: remaining < 0 ? COLORS.brick : COLORS.teal }}>
+              {remaining < 0 ? "-" : ""}{formatYen(Math.abs(remaining))}
             </span>
           </div>
-        ))}
-        <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, marginTop: 4 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>残金</span>
-          <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color: remaining < 0 ? COLORS.brick : COLORS.teal }}>
-            {remaining < 0 ? "-" : ""}{formatYen(Math.abs(remaining))}
-          </span>
+        </div>
+
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>出金</div>
+          <CashFlowSummaryTable rows={record.expenses} />
+        </div>
+
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>入金</div>
+          <CashFlowSummaryTable rows={record.income} />
         </div>
       </div>
 
@@ -473,20 +485,9 @@ function DailySummaryPanel({ data }) {
         <DailySalesTable sales={sales} />
       </div>
 
-      <div style={{ marginBottom: 24 }}>
+      <div>
         <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>勤怠一覧</div>
         <DailyShiftTable shifts={shifts} employees={employees} />
-      </div>
-
-      <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 28, maxWidth: 900 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>出金</div>
-          <CashFlowSummaryTable rows={record.expenses} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>入金</div>
-          <CashFlowSummaryTable rows={record.income} />
-        </div>
       </div>
     </div>
   );
