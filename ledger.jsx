@@ -3,13 +3,16 @@
 
    app.jsx で定義されたグローバル(COLORS/MONO/DISPLAY/SANS/
    各アイコン/TicketButton/Header/HeaderIconButton/HomeTabBar/
-   formatYen/uid/toDateInputValue/isSameDate/formatTimeShort/
-   seatDisplayLabel/useMediaQuery/React hooks)をそのまま再利用する。
-   「日次集計」タブは人件費の算出にpayroll.jsxのpayrollShiftTotal
-   関数も参照するが、実際に呼び出されるのはコンポーネントの
-   レンダー時(=全スクリプト読み込み完了後)のため、
-   payroll.jsxがこのファイルより後に読み込まれる現在の順序でも問題ない
-   (関数宣言の巻き上げにより、呼び出し時点で定義済みであればよい)。
+   formatYen/uid/toDateInputValue/isSameDate/formatDateTimeRange/
+   seatDisplayLabel/HISTORY_TABLE_COLS/useMediaQuery/React hooks)を
+   そのまま再利用する。「日次集計」タブの売上履歴・勤怠一覧は、それぞれ
+   app.jsxのHistoryScreen・payroll.jsxのShiftListPanelと同じ列構成
+   (HISTORY_TABLE_COLS/SHIFT_TABLE_COLS、および formatHours/
+   payrollShiftTotal)を再利用して表示内容を完全に一致させている。
+   payroll.jsxはこのファイルより後に読み込まれるが、SHIFT_TABLE_COLSや
+   payrollShiftTotal等の参照は実際にはコンポーネントのレンダー時
+   (=全スクリプト読み込み完了後)に評価されるため問題ない
+   (関数宣言・topレベルconstの評価順序上、呼び出し時点で定義済みであればよい)。
 
    ビルドツールを使わない構成のため、このファイルは index.html 内で
    app.jsx より後・payroll.jsx より前に <script type="text/babel">
@@ -234,8 +237,152 @@ function CashFlowSummaryTable({ rows }) {
   );
 }
 
+function DailySalesTable({ sales }) {
+  if (sales.length === 0) {
+    return <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "16px 0", textAlign: "center" }}>該当する会計データがありません</div>;
+  }
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <div style={{ minWidth: 1230 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: HISTORY_TABLE_COLS,
+            gap: 4,
+            padding: "8px 10px",
+            borderBottom: `1px solid ${COLORS.line}`,
+            fontSize: 11.5,
+            color: COLORS.inkSoft,
+            fontWeight: 700,
+          }}
+        >
+          <div>日時</div>
+          <div>座席</div>
+          <div>人数</div>
+          <div>小計</div>
+          <div>サービス料</div>
+          <div>消費税</div>
+          <div>合計</div>
+          <div>現金</div>
+          <div>カード</div>
+          <div>PayPay</div>
+          <div>売掛</div>
+          <div>メモ</div>
+        </div>
+        {sales.map((s) => (
+          <div
+            key={s.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: HISTORY_TABLE_COLS,
+              gap: 4,
+              padding: "8px 10px",
+              borderBottom: `1px dashed ${COLORS.line}`,
+              fontSize: 12.5,
+              fontFamily: MONO,
+              alignItems: "center",
+            }}
+          >
+            <div style={{ fontFamily: SANS, color: COLORS.ink }}>{formatDateTimeRange(s.startTime, s.endTime)}</div>
+            <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {seatDisplayLabel(s.seatId, s.seatName)}
+            </div>
+            <div>{s.guests}名</div>
+            <div>{formatYen(s.subtotal)}</div>
+            <div>{formatYen(s.serviceCharge)}</div>
+            <div>{formatYen(s.tax)}</div>
+            <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
+            <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
+            <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
+            <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
+            <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
+            <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {s.memo || ""}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DailyShiftTable({ shifts, employees }) {
+  if (shifts.length === 0) {
+    return <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "16px 0", textAlign: "center" }}>勤怠記録がまだありません。</div>;
+  }
+  // 勤怠一覧(SHIFT_TABLE_COLS)から末尾の「操作」列(編集・削除ボタン)を除いた列幅。
+  // 日次集計は閲覧専用のため編集操作は持たせない(編集は勤怠入力/一覧画面で行う)。
+  // SHIFT_TABLE_COLSはpayroll.jsx側のグローバルで、このファイルより後に
+  // 読み込まれるため、モジュールのトップレベルではなくレンダー時(関数内)で
+  // 参照すること(トップレベルで参照すると読み込み順序の関係でエラーになる)。
+  const dailyShiftTableCols = SHIFT_TABLE_COLS.split(" ").slice(0, -1).join(" ");
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <div style={{ minWidth: 920 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: dailyShiftTableCols,
+            gap: 4,
+            padding: "8px 10px",
+            borderBottom: `1px solid ${COLORS.line}`,
+            fontSize: 11.5,
+            color: COLORS.inkSoft,
+            fontWeight: 700,
+          }}
+        >
+          <div>日付</div>
+          <div>従業員</div>
+          <div>時間</div>
+          <div>勤務時間</div>
+          <div>時給</div>
+          <div>日給</div>
+          <div>オプション１</div>
+          <div>オプション２</div>
+          <div>合計</div>
+          <div>メモ</div>
+        </div>
+        {shifts.map((shift) => {
+          const emp = employees.find((e) => e.id === shift.employeeId);
+          const { hours, total } = payrollShiftTotal(shift, employees);
+          return (
+            <div
+              key={shift.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: dailyShiftTableCols,
+                gap: 4,
+                padding: "8px 10px",
+                borderBottom: `1px dashed ${COLORS.line}`,
+                fontSize: 12.5,
+                fontFamily: MONO,
+                alignItems: "center",
+              }}
+            >
+              <div style={{ fontFamily: SANS, color: COLORS.ink }}>{shift.date}</div>
+              <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {emp ? emp.name : "(削除済み)"}
+              </div>
+              <div>{shift.startTime}-{shift.endTime}</div>
+              <div>{formatHours(hours)}</div>
+              <div>{emp ? formatYen(emp.hourlyWage) : "-"}</div>
+              <div>{shift.dailyWage > 0 ? formatYen(shift.dailyWage) : "-"}</div>
+              <div>{shift.option > 0 ? formatYen(shift.option) : "-"}</div>
+              <div>{shift.option2 > 0 ? formatYen(shift.option2) : "-"}</div>
+              <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(total)}</div>
+              <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {shift.note || ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function DailySummaryPanel({ data }) {
-  const isNarrow = useMediaQuery("(max-width: 900px)");
+  const isNarrow = useMediaQuery("(max-width: 720px)");
   const [mode, setMode] = useState("today"); // today | date
   const [dateValue, setDateValue] = useState(toDateInputValue(new Date().toISOString()));
   const targetDate = mode === "today" ? toDateInputValue(new Date().toISOString()) : dateValue;
@@ -293,81 +440,52 @@ function DailySummaryPanel({ data }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 20 }}>
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 20 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>売上履歴</div>
-            <DailySummaryListBox isEmpty={sales.length === 0}>
-              {sales.map((s) => (
-                <DailySummaryRow key={s.id}>
-                  <span style={{ fontFamily: MONO, color: COLORS.inkSoft, flexShrink: 0 }}>{formatTimeShort(s.endTime)}</span>
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: COLORS.ink }}>
-                    {seatDisplayLabel(s.seatId, s.seatName)}
-                  </span>
-                  <span style={{ fontFamily: MONO, fontWeight: 700, color: COLORS.teal, flexShrink: 0 }}>{formatYen(s.total)}</span>
-                </DailySummaryRow>
-              ))}
-            </DailySummaryListBox>
+      <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 10, background: COLORS.paper, padding: 16, maxWidth: 460, marginBottom: 24 }}>
+        {summaryRows.map((row) => (
+          <div
+            key={row.label}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "7px 0",
+              borderBottom: `1px dashed ${COLORS.line}`,
+              fontSize: row.highlight ? 14 : 13,
+              color: row.highlight ? COLORS.ink : COLORS.inkSoft,
+              fontWeight: row.highlight ? 700 : 400,
+            }}
+          >
+            <span>{row.label}</span>
+            <span style={{ fontFamily: MONO, color: row.highlight ? COLORS.teal : COLORS.ink, fontWeight: row.highlight ? 700 : 400 }}>
+              {formatYen(row.value)}
+            </span>
           </div>
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>勤怠一覧</div>
-            <DailySummaryListBox isEmpty={shifts.length === 0}>
-              {shifts.map((shift) => {
-                const emp = employees.find((e) => e.id === shift.employeeId);
-                const { total } = payrollShiftTotal(shift, employees);
-                return (
-                  <DailySummaryRow key={shift.id}>
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: COLORS.ink }}>
-                      {emp ? emp.name : "(削除済み)"}
-                    </span>
-                    <span style={{ fontFamily: MONO, color: COLORS.inkSoft, flexShrink: 0 }}>{shift.startTime}-{shift.endTime}</span>
-                    <span style={{ fontFamily: MONO, fontWeight: 700, color: COLORS.teal, flexShrink: 0 }}>{formatYen(total)}</span>
-                  </DailySummaryRow>
-                );
-              })}
-            </DailySummaryListBox>
-          </div>
+        ))}
+        <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, marginTop: 4 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>残金</span>
+          <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color: remaining < 0 ? COLORS.brick : COLORS.teal }}>
+            {remaining < 0 ? "-" : ""}{formatYen(Math.abs(remaining))}
+          </span>
         </div>
+      </div>
 
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 20 }}>
-          <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 10, background: COLORS.paper, padding: 16 }}>
-            {summaryRows.map((row) => (
-              <div
-                key={row.label}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "7px 0",
-                  borderBottom: `1px dashed ${COLORS.line}`,
-                  fontSize: row.highlight ? 14 : 13,
-                  color: row.highlight ? COLORS.ink : COLORS.inkSoft,
-                  fontWeight: row.highlight ? 700 : 400,
-                }}
-              >
-                <span>{row.label}</span>
-                <span style={{ fontFamily: MONO, color: row.highlight ? COLORS.teal : COLORS.ink, fontWeight: row.highlight ? 700 : 400 }}>
-                  {formatYen(row.value)}
-                </span>
-              </div>
-            ))}
-            <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, marginTop: 4 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>残金</span>
-              <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color: remaining < 0 ? COLORS.brick : COLORS.teal }}>
-                {remaining < 0 ? "-" : ""}{formatYen(Math.abs(remaining))}
-              </span>
-            </div>
-          </div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>売上履歴</div>
+        <DailySalesTable sales={sales} />
+      </div>
 
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>出金</div>
-            <CashFlowSummaryTable rows={record.expenses} />
-          </div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>勤怠一覧</div>
+        <DailyShiftTable shifts={shifts} employees={employees} />
+      </div>
 
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>入金</div>
-            <CashFlowSummaryTable rows={record.income} />
-          </div>
+      <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 28, maxWidth: 900 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>出金</div>
+          <CashFlowSummaryTable rows={record.expenses} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>入金</div>
+          <CashFlowSummaryTable rows={record.income} />
         </div>
       </div>
     </div>
