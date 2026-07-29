@@ -708,7 +708,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
             employees={employees}
             editingShift={editingShift}
             onSave={saveShift}
-            onCancelEdit={() => setEditingShiftId(null)}
+            onCancelEdit={() => { setEditingShiftId(null); setTab("list"); }}
           />
         )}
         {tab === "list" && (

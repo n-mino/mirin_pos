@@ -98,7 +98,6 @@ const Store = makeIcon([
   { tag: "path", attrs: { d: "M14 7v3a2 2 0 0 1-2 2v0a2 2 0 0 1-2-2V7" } },
   { tag: "path", attrs: { d: "M6 12v0a2 2 0 0 0 2-2V7" } },
 ]);
-const ChevronRight = makeIcon([{ tag: "path", attrs: { d: "m9 18 6-6-6-6" } }]);
 const AlertCircle = makeIcon([
   { tag: "circle", attrs: { cx: 12, cy: 12, r: 10 } },
   { tag: "line", attrs: { x1: 12, x2: 12, y1: 8, y2: 12 } },
@@ -300,6 +299,20 @@ function formatDateTimeShort(iso) {
   return `${m}/${day} ${h}:${min}`;
 }
 
+function formatDateTimeFull(iso) {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${y}/${m}/${day} ${h}:${min}`;
+}
+
+function formatDateTimeRange(startIso, endIso) {
+  return `${formatDateTimeFull(startIso)} ～ ${formatDateTimeFull(endIso)}`;
+}
+
 function formatTimeShort(iso) {
   const d = new Date(iso);
   const h = String(d.getHours()).padStart(2, "0");
@@ -314,12 +327,6 @@ function csvEscape(value) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
-}
-
-function paymentLabel(payments) {
-  const names = { cash: "現金", card: "クレジット", paypay: "PayPay", onAccount: "売掛" };
-  const used = Object.entries(payments || {}).filter(([, v]) => v > 0).map(([k]) => names[k] || k);
-  return used.length > 0 ? used.join("・") : "-";
 }
 
 /* ---------------------------------------------------------
@@ -1592,6 +1599,8 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
 /* ---------------------------------------------------------
    売上履歴画面
 --------------------------------------------------------- */
+const HISTORY_TABLE_COLS = "220px 110px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
+
 function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
   const [mode, setMode] = useState("today"); // today | all | date
   const [dateValue, setDateValue] = useState(toDateInputValue(new Date().toISOString()));
@@ -1689,44 +1698,78 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
             該当する会計データがありません
           </div>
         )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 640, margin: "0 auto" }}>
-          {filtered.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => onSelectSale(s.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background: COLORS.paper,
-                border: `1.5px solid ${COLORS.line}`,
-                borderRadius: 8,
-                padding: "12px 16px",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ fontFamily: MONO, fontSize: 12, color: COLORS.inkSoft }}>
-                  {formatDateTimeShort(s.endTime)}
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>
-                  {seatDisplayLabel(s.seatId, s.seatName)} <span style={{ fontWeight: 400, color: COLORS.inkSoft, fontSize: 12.5 }}>・ {s.guests}名</span>
-                </div>
-                <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{paymentLabel(s.payments)}</div>
-                {s.memo && (
-                  <div style={{ fontSize: 12, color: COLORS.inkSoft, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260 }}>
-                    {s.memo}
+        {filtered.length > 0 && (
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 1280 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: HISTORY_TABLE_COLS,
+                  gap: 4,
+                  padding: "8px 10px",
+                  borderBottom: `1px solid ${COLORS.line}`,
+                  fontSize: 11.5,
+                  color: COLORS.inkSoft,
+                  fontWeight: 700,
+                }}
+              >
+                <div>日時</div>
+                <div>座席</div>
+                <div>人数</div>
+                <div>小計</div>
+                <div>サービス料</div>
+                <div>消費税</div>
+                <div>合計</div>
+                <div>現金</div>
+                <div>カード</div>
+                <div>PayPay</div>
+                <div>売掛</div>
+                <div>メモ</div>
+              </div>
+              {filtered.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => onSelectSale(s.id)}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: HISTORY_TABLE_COLS,
+                    gap: 4,
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    borderBottom: `1px dashed ${COLORS.line}`,
+                    fontSize: 12.5,
+                    fontFamily: MONO,
+                    background: "transparent",
+                    border: "none",
+                    borderBottomStyle: "dashed",
+                    borderBottomWidth: 1,
+                    borderBottomColor: COLORS.line,
+                    cursor: "pointer",
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ fontFamily: SANS, color: COLORS.ink }}>{formatDateTimeRange(s.startTime, s.endTime)}</div>
+                  <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {seatDisplayLabel(s.seatId, s.seatName)}
                   </div>
-                )}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontFamily: MONO, fontSize: 17, fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</span>
-                <ChevronRight size={16} color={COLORS.inkSoft} />
-              </div>
-            </button>
-          ))}
-        </div>
+                  <div>{s.guests}名</div>
+                  <div>{formatYen(s.subtotal)}</div>
+                  <div>{formatYen(s.serviceCharge)}</div>
+                  <div>{formatYen(s.tax)}</div>
+                  <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
+                  <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
+                  <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
+                  <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
+                  <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
+                  <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.memo || ""}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
