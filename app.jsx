@@ -437,7 +437,7 @@ function HeaderIconButton({ icon: Icon, onClick, title }) {
 const HOME_TABS = [
   { id: "seats", label: "座席一覧" },
   { id: "history", label: "売上履歴" },
-  { id: "cashflow", label: "入出金管理" },
+  { id: "salesManagement", label: "売上管理" },
   { id: "payroll", label: "アルバイト管理" },
 ];
 
@@ -1855,8 +1855,8 @@ function HistoryDetailScreen({ sale, onBack }) {
 function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [screen, setScreen] = useState("top"); // top | order | checkout | settings | history | historyDetail | cashflow | payroll
-  const [homeTab, setHomeTab] = useState("seats"); // seats | history | cashflow | payroll
+  const [screen, setScreen] = useState("top"); // top | order | checkout | settings | history | historyDetail | salesManagement | payroll
+  const [homeTab, setHomeTab] = useState("seats"); // seats | history | salesManagement | payroll
   const [activeSeat, setActiveSeat] = useState(null);
   const [guestModalSeat, setGuestModalSeat] = useState(null);
   const [selectedSaleId, setSelectedSaleId] = useState(null);
@@ -2076,9 +2076,9 @@ function App() {
         />
       )}
 
-      {screen === "cashflow" && (
-        <CashFlowScreen
-          cashFlow={data.cashFlow}
+      {screen === "salesManagement" && (
+        <SalesManagementScreen
+          data={data}
           onUpdateCashFlow={onUpdateCashFlow}
           onOpenSettings={() => setScreen("settings")}
           activeHomeTab={homeTab}
