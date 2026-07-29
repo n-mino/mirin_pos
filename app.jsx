@@ -1454,26 +1454,46 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
               端末の故障やブラウザデータの消去に備えて、定期的にバックアップの書き出しをおすすめします。
             </div>
 
-            {storageEstimate && storageEstimate.quota > 0 && (
-              <div style={{ marginBottom: 24, padding: 14, background: COLORS.sageBg, borderRadius: 8 }}>
-                <div style={{ fontSize: 12, color: COLORS.ink, fontWeight: 700, marginBottom: 6 }}>この端末での使用容量</div>
-                <div style={{ fontSize: 14, fontFamily: MONO, color: COLORS.ink, fontWeight: 700 }}>
-                  {formatBytes(storageEstimate.usage)} <span style={{ fontWeight: 400, color: COLORS.inkSoft }}>/ {formatBytes(storageEstimate.quota)}</span>
-                </div>
-                <div style={{ height: 6, background: COLORS.paper, borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
+            {storageEstimate && storageEstimate.quota > 0 && (() => {
+              const rawData = localStorage.getItem(STORAGE_KEY);
+              const appDataBytes = rawData ? new Blob([rawData]).size : 0;
+              return (
+                <div style={{ marginBottom: 24, padding: 14, background: COLORS.sageBg, borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, color: COLORS.ink, fontWeight: 700, marginBottom: 10 }}>この端末での使用容量</div>
+
+                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 4 }}>ブラウザでの使用量(全体)</div>
+                  <div style={{ fontSize: 14, fontFamily: MONO, color: COLORS.ink, fontWeight: 700 }}>
+                    {formatBytes(storageEstimate.usage)} <span style={{ fontWeight: 400, color: COLORS.inkSoft }}>/ {formatBytes(storageEstimate.quota)}</span>
+                  </div>
+                  <div style={{ height: 6, background: COLORS.paper, borderRadius: 3, marginTop: 8, marginBottom: 12, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${Math.min(100, (storageEstimate.usage / storageEstimate.quota) * 100)}%`,
+                        background: COLORS.teal,
+                      }}
+                    />
+                  </div>
+
                   <div
                     style={{
-                      height: "100%",
-                      width: `${Math.min(100, (storageEstimate.usage / storageEstimate.quota) * 100)}%`,
-                      background: COLORS.teal,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      paddingTop: 10,
+                      borderTop: `1px dashed ${COLORS.line}`,
                     }}
-                  />
+                  >
+                    <span style={{ fontSize: 11.5, color: COLORS.inkSoft }}>うちアプリデータ本体(商品・座席・売上等)</span>
+                    <span style={{ fontSize: 14, fontFamily: MONO, color: COLORS.ink, fontWeight: 700 }}>{formatBytes(appDataBytes)}</span>
+                  </div>
+
+                  <div style={{ fontSize: 10.5, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.5 }}>
+                    ※「ブラウザでの使用量」はReact本体等のオフラインキャッシュも含むこのアプリ全体の使用量、「アプリデータ本体」はバックアップに書き出される実データのみのサイズです。
+                  </div>
                 </div>
-                <div style={{ fontSize: 10.5, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.5 }}>
-                  ※オフラインキャッシュ(アプリ本体)も含めたこの端末・ブラウザでの合計使用量です。売上等のデータ自体は通常ごくわずかです。
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 8 }}>バックアップの書き出し</div>
