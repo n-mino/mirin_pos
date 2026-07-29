@@ -748,7 +748,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
         ))}
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: 20, maxWidth: 640, margin: "0 auto", width: "100%" }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: 20, maxWidth: tab === "list" ? "none" : 640, margin: "0 auto", width: "100%" }}>
         {tab === "employees" && (
           <EmployeeListPanel
             employees={employees}

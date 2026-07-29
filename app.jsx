@@ -1709,7 +1709,7 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
                 <div>小計</div>
                 <div>サービス料</div>
                 <div>消費税</div>
-                <div style={{ background: COLORS.sageBg, color: COLORS.teal, borderRadius: 6, padding: "2px 8px", margin: "-2px 0" }}>合計</div>
+                <div>合計</div>
                 <div>現金</div>
                 <div>カード</div>
                 <div>PayPay</div>
@@ -1747,9 +1747,7 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
                   <div>{formatYen(s.subtotal)}</div>
                   <div>{formatYen(s.serviceCharge)}</div>
                   <div>{formatYen(s.tax)}</div>
-                  <div style={{ fontWeight: 700, color: COLORS.teal, background: COLORS.sageBg, borderRadius: 6, padding: "2px 8px", margin: "-2px 0" }}>
-                    {formatYen(s.total)}
-                  </div>
+                  <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
                   <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
                   <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
                   <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
