@@ -197,6 +197,18 @@ function formatYen(n) {
   return `¥${Math.round(n).toLocaleString("ja-JP")}`;
 }
 
+function formatBytes(bytes) {
+  if (!bytes || bytes < 1024) return `${bytes || 0} B`;
+  const units = ["KB", "MB", "GB"];
+  let val = bytes / 1024;
+  let i = 0;
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024;
+    i++;
+  }
+  return `${val.toFixed(1)} ${units[i]}`;
+}
+
 // 座席名が設定されていれば名前のみ、なければ番号にフォールバック
 function seatDisplayLabel(n, seatName) {
   return seatName || `座席 ${n}`;
@@ -1153,7 +1165,14 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const [taxInput, setTaxInput] = useState(String(data.taxRate ?? 0));
   const [importError, setImportError] = useState("");
   const [importOk, setImportOk] = useState("");
+  const [storageEstimate, setStorageEstimate] = useState(null);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then(setStorageEstimate).catch(() => {});
+    }
+  }, []);
 
   const exportData = () => {
     const payload = {
@@ -1434,6 +1453,27 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
               このアプリのデータはこの端末内(ローカル)にのみ保存されています。
               端末の故障やブラウザデータの消去に備えて、定期的にバックアップの書き出しをおすすめします。
             </div>
+
+            {storageEstimate && storageEstimate.quota > 0 && (
+              <div style={{ marginBottom: 24, padding: 14, background: COLORS.sageBg, borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: COLORS.ink, fontWeight: 700, marginBottom: 6 }}>この端末での使用容量</div>
+                <div style={{ fontSize: 14, fontFamily: MONO, color: COLORS.ink, fontWeight: 700 }}>
+                  {formatBytes(storageEstimate.usage)} <span style={{ fontWeight: 400, color: COLORS.inkSoft }}>/ {formatBytes(storageEstimate.quota)}</span>
+                </div>
+                <div style={{ height: 6, background: COLORS.paper, borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.min(100, (storageEstimate.usage / storageEstimate.quota) * 100)}%`,
+                      background: COLORS.teal,
+                    }}
+                  />
+                </div>
+                <div style={{ fontSize: 10.5, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.5 }}>
+                  ※オフラインキャッシュ(アプリ本体)も含めたこの端末・ブラウザでの合計使用量です。売上等のデータ自体は通常ごくわずかです。
+                </div>
+              </div>
+            )}
 
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 8 }}>バックアップの書き出し</div>
