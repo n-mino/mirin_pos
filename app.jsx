@@ -1562,6 +1562,112 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
 }
 
 /* ---------------------------------------------------------
+   使用方法パネル(マスタ設定内)
+--------------------------------------------------------- */
+function GuideSection({ title, children }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10, fontFamily: DISPLAY }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function GuideItem({ label, children }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink, marginBottom: 3 }}>・{label}</div>
+      <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.7, paddingLeft: 14 }}>{children}</div>
+    </div>
+  );
+}
+
+function UserGuidePanel() {
+  return (
+    <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20 }}>
+      <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 24, lineHeight: 1.7 }}>
+        このアプリの基本的な使い方をまとめています。データはこの端末内にのみ保存されるため、機種変更や故障に備えて「データ管理」から定期的にバックアップを書き出してください。
+      </div>
+
+      <GuideSection title="① 座席一覧">
+        <GuideItem label="会計の流れ">
+          座席カードをタップ→人数を選択して「開始する」→商品をタップして注文を追加→「会計へ進む」→お支払い方法(現金・カード・PayPay・売掛)を入力し「会計を確定して座席を空ける」で完了します。
+        </GuideItem>
+        <GuideItem label="座席名">
+          マスタ設定の「座席設定」で座席に名前を付けると、座席一覧・注文・会計・売上履歴の表示が座席名に置き換わります(未設定の座席は「座席1」のように番号表示になります)。
+        </GuideItem>
+      </GuideSection>
+
+      <GuideSection title="② 売上履歴">
+        <GuideItem label="絞り込み">
+          「本日のみ」「すべて」、または日付を指定して過去の会計記録を一覧表示できます。行をタップすると明細(注文内容)を確認できます。
+        </GuideItem>
+        <GuideItem label="CSVダウンロード">
+          画面右上の「CSVダウンロード」で、表示中の絞り込み条件のままCSVファイルとして書き出せます。
+        </GuideItem>
+      </GuideSection>
+
+      <GuideSection title="③ 売上管理">
+        <GuideItem label="入出金入力">
+          日付ごとに、レジからの出金(仕入れなど)・入金(釣銭準備金など)を「摘要」「金額」で記録します。「+項目追加」で行を増やせます。
+        </GuideItem>
+        <GuideItem label="日次集計">
+          指定した日の総売上(現金+カード+PayPay+売掛)・人件費(アルバイト管理の勤怠から自動計算)・出金/入金・残金(現金-人件費-出金+入金)をまとめて確認できます。その日の売上履歴・勤怠一覧もあわせて表示されますが、編集はできません(編集は各専用画面で行ってください)。
+        </GuideItem>
+        <GuideItem label="PDFで保存(印刷)">
+          「PDFで保存(印刷)」を押すと印刷用の画面が別ウィンドウで開きます。ブラウザの印刷ダイアログで「PDFに保存」を選ぶとPDFファイルとして保存できます。
+        </GuideItem>
+      </GuideSection>
+
+      <GuideSection title="④ アルバイト管理">
+        <GuideItem label="勤怠入力">
+          従業員・日付・開始/終了時刻(15分単位)を入力して記録します。日給を入力した場合は、時給×時間の計算より日給が優先されます。
+        </GuideItem>
+        <GuideItem label="勤怠一覧">
+          「個別」で従業員ごと、「全員一括」で全員分の勤怠記録を確認できます。「CSVダウンロード」で表示中のデータを書き出せます。
+        </GuideItem>
+        <GuideItem label="集計">
+          月次・年次で従業員ごとの給与を自動集計します。
+        </GuideItem>
+        <GuideItem label="アルバイトマスタ">
+          従業員の氏名・時給を登録・編集・削除します。
+        </GuideItem>
+      </GuideSection>
+
+      <GuideSection title="⑤ マスタ設定">
+        <GuideItem label="商品管理">
+          商品の名称・価格・カテゴリを登録します。時間帯によって価格を変える「時間帯価格」も設定できます。
+        </GuideItem>
+        <GuideItem label="座席設定">
+          座席の追加・削除・名称の設定を行います。
+        </GuideItem>
+        <GuideItem label="税・サービス料">
+          サービス料率・消費税率を設定します。会計時は「小計→サービス料→消費税」の順で自動計算されます。
+        </GuideItem>
+        <GuideItem label="パスワード設定">
+          売上履歴・売上管理・アルバイト管理の3画面それぞれにパスワードを設定できます。2画面以上に設定する場合は「共通のパスワード」か「画面ごとに個別」かを選べます。「ロックのタイミング」では、アプリ起動中は初回のみ確認するか、画面を開くたび毎回確認するかを選べます。パスワードを忘れた場合は、この画面下部の「パスワードをリセット」からリセット用のキーワードを入力するとすべての設定を解除できます。キーワードは管理者に問い合わせてください。
+        </GuideItem>
+        <GuideItem label="データ管理">
+          この端末での使用容量の確認、全データのJSONファイルへの書き出し(バックアップ)、書き出したJSONファイルからの復元ができます。
+        </GuideItem>
+      </GuideSection>
+
+      <GuideSection title="データの保存について">
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.7 }}>
+          このアプリのデータはインターネット上のサーバーではなく、この端末(ブラウザ)内にのみ保存されます。ブラウザのデータを消去したり端末が故障したりするとデータが失われるため、「データ管理」の「全データをJSONで書き出す」を定期的に行い、バックアップファイルを安全な場所に保管することをおすすめします。
+        </div>
+      </GuideSection>
+
+      <GuideSection title="オフラインでの利用">
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.7 }}>
+          一度開いた端末では、インターネットに接続していなくても引き続き利用できます(接続が切れると画面上部に「オフラインで動作中です」と表示されます)。ホーム画面にアプリを追加しておくと、通常のアプリのように起動できて便利です。
+        </div>
+      </GuideSection>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
 function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData, onUpdateSecurity, onResetSecurity }) {
@@ -1668,7 +1774,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
       <Header title="マスタ設定" onBack={onBack} />
 
       <div style={{ display: "flex", gap: 6, padding: "12px 20px", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper, overflowX: "auto" }}>
-        {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "password", label: "パスワード設定" }, { id: "data", label: "データ管理" }].map((t) => (
+        {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "password", label: "パスワード設定" }, { id: "data", label: "データ管理" }, { id: "help", label: "使用方法" }].map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -1929,6 +2035,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             </div>
           </div>
         )}
+
+        {tab === "help" && <UserGuidePanel />}
       </div>
 
       {editing !== null && (
