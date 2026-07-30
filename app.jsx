@@ -135,6 +135,16 @@ const CalendarDays = makeIcon([
   { tag: "line", attrs: { x1: 3, x2: 21, y1: 10, y2: 10 } },
   { tag: "path", attrs: { d: "M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" } },
 ]);
+const Download = makeIcon([
+  { tag: "path", attrs: { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" } },
+  { tag: "polyline", attrs: { points: "7 10 12 15 17 10" } },
+  { tag: "line", attrs: { x1: 12, x2: 12, y1: 15, y2: 3 } },
+]);
+const Printer = makeIcon([
+  { tag: "polyline", attrs: { points: "6 9 6 2 18 2 18 9" } },
+  { tag: "path", attrs: { d: "M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" } },
+  { tag: "rect", attrs: { x: 6, y: 14, width: 12, height: 8 } },
+]);
 
 /* ---------------------------------------------------------
    デザイントークン(オーダーチケット / 伝票テイスト)
@@ -330,6 +340,39 @@ function csvEscape(value) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
+}
+
+const BOM = String.fromCharCode(0xFEFF); // Excelで文字化けしないようUTF-8 BOMを付与
+
+// rows(2次元配列。1行目はヘッダー)をCSVファイルとしてダウンロードする共通処理
+function downloadCsv(filename, rows) {
+  const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\r\n");
+  const blob = new Blob([BOM + csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function csvTimestamp() {
+  return new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+}
+
+// 売上履歴(売上履歴画面・マスタ設定の全件書き出し双方で使う行データ)
+function salesHistoryToCsvRows(salesHistory) {
+  const rows = [["会計ID", "日時", "座席", "人数", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
+  (salesHistory || []).forEach((s) => {
+    rows.push([
+      s.id, s.endTime, seatDisplayLabel(s.seatId, s.seatName), s.guests, s.subtotal, s.serviceCharge, s.tax, s.total,
+      s.payments?.cash || 0, s.payments?.card || 0, s.payments?.paypay || 0, s.payments?.onAccount || 0,
+      s.memo || "",
+    ]);
+  });
+  return rows;
 }
 
 /* ---------------------------------------------------------
@@ -1192,28 +1235,6 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
     URL.revokeObjectURL(url);
   };
 
-  const exportSalesCsv = () => {
-    const rows = [["会計ID", "日時", "座席", "人数", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
-    (data.salesHistory || []).forEach((s) => {
-      rows.push([
-        s.id, s.endTime, seatDisplayLabel(s.seatId, s.seatName), s.guests, s.subtotal, s.serviceCharge, s.tax, s.total,
-        s.payments?.cash || 0, s.payments?.card || 0, s.payments?.paypay || 0, s.payments?.onAccount || 0,
-        s.memo || "",
-      ]);
-    });
-    const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\r\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    a.href = url;
-    a.download = `sales-history_${stamp}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const handleImportFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1500,11 +1521,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
               <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 10 }}>
                 商品・座席・売上履歴・設定をすべて含むJSONファイルをダウンロードします。
               </div>
-              <TicketButton variant="primary" onClick={exportData} style={{ width: "100%", marginBottom: 8 }}>
+              <TicketButton variant="primary" onClick={exportData} style={{ width: "100%" }}>
                 全データをJSONで書き出す
-              </TicketButton>
-              <TicketButton variant="ghost" onClick={exportSalesCsv} style={{ width: "100%" }}>
-                売上履歴のみCSVで書き出す
               </TicketButton>
             </div>
 
@@ -1726,6 +1744,29 @@ function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeT
             style={{ border: "none", background: "transparent", fontFamily: MONO, fontSize: 13, color: COLORS.ink }}
           />
         </div>
+        <button
+          onClick={() => {
+            const suffix = mode === "today" ? "today" : mode === "date" ? dateValue : "all";
+            downloadCsv(`sales-history_${suffix}_${csvTimestamp()}.csv`, salesHistoryToCsvRows(filtered));
+          }}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "8px 14px",
+            borderRadius: 20,
+            border: `1.5px solid ${COLORS.line}`,
+            background: "transparent",
+            color: COLORS.inkSoft,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          <Download size={14} />
+          CSVダウンロード
+        </button>
       </div>
 
       <div

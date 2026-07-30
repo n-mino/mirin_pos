@@ -381,6 +381,141 @@ function DailyShiftTable({ shifts, employees }) {
   );
 }
 
+// 印刷用HTML組み立て時のエスケープ(ユーザー入力のメモ等をそのまま埋め込まないため)
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+// 日次集計を印刷用の別ウィンドウで開き、ブラウザの印刷機能(→PDFとして保存)を呼び出す。
+// 現在の画面(flex/overflow:autoの入れ子レイアウト)をそのまま印刷すると
+// スクロール領域からはみ出た部分が切れてしまうため、印刷専用の単純なHTMLを
+// 新しいウィンドウに組み立てて印刷する方式にしている。
+function printDailySummary({ targetDate, summaryRows, remaining, expenses, income, sales, shifts, employees }) {
+  const style = `
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif; color: #20291F; padding: 24px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    h2 { font-size: 13px; margin: 22px 0 8px; border-bottom: 2px solid #1D4E4B; padding-bottom: 4px; }
+    .sub { font-size: 12px; color: #5B6459; margin-bottom: 18px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { border-bottom: 1px solid #DCD4C4; padding: 5px 6px; text-align: left; }
+    th { color: #5B6459; font-weight: 700; }
+    .num { text-align: right; }
+    tr.highlight td { font-weight: 700; }
+    .remaining { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; margin-top: 8px; padding-top: 8px; border-top: 1.5px solid #20291F; }
+    .cols { display: flex; gap: 24px; }
+    .cols > div { flex: 1; min-width: 0; }
+    @media print { body { padding: 8px; } }
+  `;
+
+  const summaryRowsHtml = summaryRows.map((r) => `
+    <tr class="${r.highlight ? "highlight" : ""}">
+      <td>${escapeHtml(r.label)}</td>
+      <td class="num">${escapeHtml(formatYen(r.value))}</td>
+    </tr>
+  `).join("");
+
+  const cashFlowRowsHtml = (rows) => {
+    const filled = rows.filter((r) => r.memo.trim() || Number(r.amount) > 0);
+    if (filled.length === 0) {
+      return `<tr><td colspan="2" class="num" style="text-align:center;color:#5B6459">なし</td></tr>`;
+    }
+    return filled.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.memo.trim() || "(名称未設定)")}</td>
+        <td class="num">${escapeHtml(formatYen(Math.max(0, Number(r.amount) || 0)))}</td>
+      </tr>
+    `).join("");
+  };
+
+  const salesRowsHtml = sales.length === 0
+    ? `<tr><td colspan="12" style="text-align:center;color:#5B6459">該当する会計データがありません</td></tr>`
+    : sales.map((s) => `
+      <tr>
+        <td>${escapeHtml(formatDateTimeRange(s.startTime, s.endTime))}</td>
+        <td>${escapeHtml(seatDisplayLabel(s.seatId, s.seatName))}</td>
+        <td class="num">${s.guests}名</td>
+        <td class="num">${escapeHtml(formatYen(s.subtotal))}</td>
+        <td class="num">${escapeHtml(formatYen(s.serviceCharge))}</td>
+        <td class="num">${escapeHtml(formatYen(s.tax))}</td>
+        <td class="num">${escapeHtml(formatYen(s.total))}</td>
+        <td class="num">${s.payments?.cash ? escapeHtml(formatYen(s.payments.cash)) : "-"}</td>
+        <td class="num">${s.payments?.card ? escapeHtml(formatYen(s.payments.card)) : "-"}</td>
+        <td class="num">${s.payments?.paypay ? escapeHtml(formatYen(s.payments.paypay)) : "-"}</td>
+        <td class="num">${s.payments?.onAccount ? escapeHtml(formatYen(s.payments.onAccount)) : "-"}</td>
+        <td>${escapeHtml(s.memo || "")}</td>
+      </tr>
+    `).join("");
+
+  const shiftRowsHtml = shifts.length === 0
+    ? `<tr><td colspan="10" style="text-align:center;color:#5B6459">勤怠記録がまだありません。</td></tr>`
+    : shifts.map((shift) => {
+      const emp = employees.find((e) => e.id === shift.employeeId);
+      const { hours, total } = payrollShiftTotal(shift, employees);
+      return `
+        <tr>
+          <td>${escapeHtml(shift.date)}</td>
+          <td>${escapeHtml(emp ? emp.name : "(削除済み)")}</td>
+          <td>${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)}</td>
+          <td class="num">${escapeHtml(formatHours(hours))}</td>
+          <td class="num">${emp ? escapeHtml(formatYen(emp.hourlyWage)) : "-"}</td>
+          <td class="num">${shift.dailyWage > 0 ? escapeHtml(formatYen(shift.dailyWage)) : "-"}</td>
+          <td class="num">${shift.option > 0 ? escapeHtml(formatYen(shift.option)) : "-"}</td>
+          <td class="num">${shift.option2 > 0 ? escapeHtml(formatYen(shift.option2)) : "-"}</td>
+          <td class="num">${escapeHtml(formatYen(total))}</td>
+          <td>${escapeHtml(shift.note || "")}</td>
+        </tr>
+      `;
+    }).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>日次集計_${escapeHtml(targetDate)}</title><style>${style}</style></head>
+<body>
+  <h1>日次集計</h1>
+  <div class="sub">対象日: ${escapeHtml(targetDate)}</div>
+
+  <div class="cols">
+    <div>
+      <h2>概要</h2>
+      <table><tbody>${summaryRowsHtml}</tbody></table>
+      <div class="remaining"><span>残金</span><span>${remaining < 0 ? "-" : ""}${escapeHtml(formatYen(Math.abs(remaining)))}</span></div>
+    </div>
+    <div>
+      <h2>出金</h2>
+      <table><tbody>${cashFlowRowsHtml(expenses)}</tbody></table>
+    </div>
+    <div>
+      <h2>入金</h2>
+      <table><tbody>${cashFlowRowsHtml(income)}</tbody></table>
+    </div>
+  </div>
+
+  <h2>売上履歴</h2>
+  <table>
+    <thead><tr><th>日時</th><th>座席</th><th>人数</th><th>小計</th><th>サービス料</th><th>消費税</th><th>合計</th><th>現金</th><th>カード</th><th>PayPay</th><th>売掛</th><th>メモ</th></tr></thead>
+    <tbody>${salesRowsHtml}</tbody>
+  </table>
+
+  <h2>勤怠一覧</h2>
+  <table>
+    <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>日給</th><th>オプション1</th><th>オプション2</th><th>合計</th><th>メモ</th></tr></thead>
+    <tbody>${shiftRowsHtml}</tbody>
+  </table>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。");
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 300);
+}
+
 function DailySummaryPanel({ data }) {
   const isNarrow = useMediaQuery("(max-width: 720px)");
   const [mode, setMode] = useState("today"); // today | date
@@ -438,6 +573,26 @@ function DailySummaryPanel({ data }) {
             style={{ border: "none", background: "transparent", fontFamily: MONO, fontSize: 13, color: COLORS.ink }}
           />
         </div>
+        <button
+          onClick={() => printDailySummary({ targetDate, summaryRows, remaining, expenses: record.expenses, income: record.income, sales, shifts, employees })}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "8px 14px",
+            borderRadius: 20,
+            border: `1.5px solid ${COLORS.line}`,
+            background: "transparent",
+            color: COLORS.inkSoft,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          <Printer size={14} />
+          PDFで保存(印刷)
+        </button>
       </div>
 
       <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 20, marginBottom: 24 }}>

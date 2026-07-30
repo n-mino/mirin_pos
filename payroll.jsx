@@ -394,6 +394,21 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   }
   list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
+  const exportShiftsCsv = () => {
+    const rows = [["日付", "従業員", "開始", "終了", "勤務時間", "時給", "日給", "オプション1", "オプション2", "合計", "メモ"]];
+    list.forEach((shift) => {
+      const emp = employees.find((e) => e.id === shift.employeeId);
+      const { hours, total } = payrollShiftTotal(shift, employees);
+      rows.push([
+        shift.date, emp ? emp.name : "(削除済み)", shift.startTime, shift.endTime, formatHours(hours),
+        emp ? emp.hourlyWage : 0, shift.dailyWage || 0, shift.option || 0, shift.option2 || 0, total,
+        shift.note || "",
+      ]);
+    });
+    const suffix = viewMode === "individual" ? (employees.find((e) => e.id === selectedEmployeeId)?.name || "individual") : "all";
+    downloadCsv(`shift-list_${suffix}_${csvTimestamp()}.csv`, rows);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
@@ -408,6 +423,26 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
             ))}
           </select>
         )}
+        <button
+          onClick={exportShiftsCsv}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "8px 14px",
+            borderRadius: 20,
+            border: `1.5px solid ${COLORS.line}`,
+            background: "transparent",
+            color: COLORS.inkSoft,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          <Download size={14} />
+          CSVダウンロード
+        </button>
       </div>
 
       {list.length === 0 ? (
