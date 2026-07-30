@@ -145,6 +145,10 @@ const Printer = makeIcon([
   { tag: "path", attrs: { d: "M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" } },
   { tag: "rect", attrs: { x: 6, y: 14, width: 12, height: 8 } },
 ]);
+const Lock = makeIcon([
+  { tag: "rect", attrs: { x: 3, y: 11, width: 18, height: 11, rx: 2 } },
+  { tag: "path", attrs: { d: "M7 11V7a5 5 0 0 1 10 0v4" } },
+]);
 
 /* ---------------------------------------------------------
    デザイントークン(オーダーチケット / 伝票テイスト)
@@ -196,8 +200,31 @@ function defaultData() {
     taxRate: 10, // %
     payroll: { employees: [], shifts: [] },
     cashFlow: { records: {} }, // 日付(YYYY-MM-DD) -> { expenses:[], income:[] }
+    security: {
+      enabled: { history: false, salesManagement: false, payroll: false },
+      mode: "shared", // "shared" | "individual"(2画面以上選択時のみ意味を持つ)
+      lockMode: "session", // "session"(起動中は初回のみ) | "always"(タブを開くたび)
+      passwords: { history: "", salesManagement: "", payroll: "" }, // PASSWORD_PREFIXを付与して保存
+    },
   };
 }
+
+// パスワードは平文にPASSWORD_PREFIXを付与して保存する(ユーザー指定の仕様)。
+// 暗号学的な保護ではなく、バックアップJSONを直接開いた際の簡易な難読化のみが目的。
+const PASSWORD_PREFIX = "MIRIN";
+function encodePassword(raw) {
+  return PASSWORD_PREFIX + raw;
+}
+function decodePassword(stored) {
+  return stored && stored.startsWith(PASSWORD_PREFIX) ? stored.slice(PASSWORD_PREFIX.length) : (stored || "");
+}
+function verifyPassword(enteredRaw, storedEncoded) {
+  return !!storedEncoded && encodePassword(enteredRaw) === storedEncoded;
+}
+
+const SECURITY_SCREEN_ORDER = ["history", "salesManagement", "payroll"];
+const SECURITY_SCREEN_LABELS = { history: "売上履歴", salesManagement: "売上管理", payroll: "アルバイト管理" };
+const SECURITY_RESET_KEYWORD = "09044249596";
 
 function uid(prefix = "id") {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -809,6 +836,127 @@ function ConfirmModal({ title, message, confirmLabel = "OK", onConfirm, onCancel
   );
 }
 
+// 対象画面(売上履歴・売上管理・アルバイト管理)を開く際のパスワード入力モーダル
+function PasswordPromptModal({ label, stored, onCancel, onSuccess }) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+
+  const handleConfirm = () => {
+    if (verifyPassword(value, stored)) {
+      onSuccess();
+    } else {
+      setError("パスワードが違います。");
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(20,24,20,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 150,
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: COLORS.paper,
+          borderRadius: 14,
+          padding: 28,
+          width: "100%",
+          maxWidth: 320,
+          textAlign: "center",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+        }}
+      >
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: COLORS.sageBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+          <Lock size={22} color={COLORS.sage} />
+        </div>
+        <div style={{ fontFamily: DISPLAY, fontSize: 17, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>
+          パスワードが必要です
+        </div>
+        <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 20, lineHeight: 1.6 }}>
+          「{label}」を開くにはパスワードを入力してください。
+        </div>
+        <input
+          type="password"
+          value={value}
+          onChange={(e) => { setValue(e.target.value); setError(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
+          autoFocus
+          style={{
+            width: "100%", padding: 12, borderRadius: 8, border: `1.5px solid ${COLORS.line}`,
+            fontFamily: MONO, fontSize: 16, textAlign: "center", letterSpacing: 4, color: COLORS.ink, marginBottom: 10,
+          }}
+        />
+        <div style={{ fontSize: 12, color: COLORS.brick, marginBottom: 14, minHeight: 16 }}>{error}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <TicketButton variant="ghost" onClick={onCancel} style={{ flex: 1 }}>キャンセル</TicketButton>
+          <TicketButton variant="primary" onClick={handleConfirm} style={{ flex: 1 }}>開く</TicketButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// パスワードリセット(全画面のパスワード設定を解除する)確認モーダル。
+// キーワード一致のみで判定するローカル完結の仕組みのため、
+// リセット用キーワード(SECURITY_RESET_KEYWORD)はクライアントコード上に平文で存在し、
+// ブラウザの開発者ツール等から閲覧され得る(サーバー側検証がないため)。
+function SecurityResetModal({ onCancel, onConfirm }) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+
+  const handleConfirm = () => {
+    const ok = onConfirm(value);
+    if (!ok) setError("キーワードが違います。");
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(20,24,20,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 150,
+        padding: 20,
+      }}
+    >
+      <div style={{ background: COLORS.paper, borderRadius: 12, padding: 26, width: "100%", maxWidth: 360, boxShadow: "0 12px 40px rgba(0,0,0,0.25)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <AlertCircle size={20} color={COLORS.brick} />
+          <div style={{ fontFamily: DISPLAY, fontSize: 18, fontWeight: 700, color: COLORS.ink }}>パスワードをリセット</div>
+        </div>
+        <div style={{ fontSize: 13.5, color: COLORS.inkSoft, lineHeight: 1.6, marginBottom: 16 }}>
+          すべてのパスワード設定を解除します。リセット用のキーワードを入力してください。
+        </div>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => { setValue(e.target.value); setError(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
+          autoFocus
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, fontFamily: MONO, fontSize: 15, color: COLORS.ink, marginBottom: 8 }}
+        />
+        <div style={{ fontSize: 12, color: COLORS.brick, marginBottom: 16, minHeight: 16 }}>{error}</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <TicketButton variant="ghost" onClick={onCancel} style={{ flex: 1 }}>キャンセル</TicketButton>
+          <TicketButton variant="danger" onClick={handleConfirm} style={{ flex: 1, background: COLORS.brick, color: "#FBF9F4" }}>
+            リセットする
+          </TicketButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------
    注文画面
 --------------------------------------------------------- */
@@ -1198,10 +1346,225 @@ function SeatNameInput({ initialValue, onSave }) {
   );
 }
 
+function securitySegmentStyle(active) {
+  return {
+    flex: 1,
+    padding: "9px 10px",
+    borderRadius: 8,
+    border: `1.5px solid ${active ? COLORS.teal : COLORS.line}`,
+    background: active ? COLORS.teal : "transparent",
+    color: active ? "#FBF9F4" : COLORS.inkSoft,
+    fontSize: 12.5,
+    fontWeight: 700,
+    fontFamily: SANS,
+    cursor: "pointer",
+  };
+}
+
+const securityInputStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 8,
+  border: `1.5px solid ${COLORS.line}`,
+  background: "#fff",
+  fontFamily: MONO,
+  fontSize: 14,
+  color: COLORS.ink,
+};
+
+/* ---------------------------------------------------------
+   パスワード設定パネル(マスタ設定内)
+--------------------------------------------------------- */
+function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) {
+  const [enabled, setEnabled] = useState({ ...security.enabled });
+  const [mode, setMode] = useState(security.mode || "shared");
+  const [lockMode, setLockMode] = useState(security.lockMode || "session");
+  const [sharedPw, setSharedPw] = useState("");
+  const [sharedPwConfirm, setSharedPwConfirm] = useState("");
+  const [individualPw, setIndividualPw] = useState({ history: "", salesManagement: "", payroll: "" });
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  const enabledKeys = SECURITY_SCREEN_ORDER.filter((k) => enabled[k]);
+
+  const toggle = (key) => {
+    setEnabled((prev) => ({ ...prev, [key]: !prev[key] }));
+    setError("");
+    setSaved("");
+  };
+
+  const handleSave = () => {
+    setError("");
+    setSaved("");
+
+    if (enabledKeys.length === 0) {
+      onUpdateSecurity({ enabled: { ...enabled }, mode, lockMode, passwords: { history: "", salesManagement: "", payroll: "" } });
+      setSaved("保存しました");
+      return;
+    }
+
+    const newPasswords = { history: "", salesManagement: "", payroll: "" };
+
+    if (enabledKeys.length === 1 || mode === "shared") {
+      if (!sharedPw.trim()) { setError("パスワードを入力してください。"); return; }
+      if (sharedPw !== sharedPwConfirm) { setError("パスワード(確認)が一致しません。"); return; }
+      enabledKeys.forEach((k) => { newPasswords[k] = encodePassword(sharedPw); });
+    } else {
+      for (const k of enabledKeys) {
+        if (!individualPw[k]?.trim()) { setError(`${SECURITY_SCREEN_LABELS[k]}のパスワードを入力してください。`); return; }
+      }
+      enabledKeys.forEach((k) => { newPasswords[k] = encodePassword(individualPw[k]); });
+    }
+
+    onUpdateSecurity({ enabled: { ...enabled }, mode, lockMode, passwords: newPasswords });
+    setSharedPw("");
+    setSharedPwConfirm("");
+    setIndividualPw({ history: "", salesManagement: "", payroll: "" });
+    setSaved("保存しました");
+  };
+
+  const handleResetConfirm = (keyword) => {
+    if (keyword !== SECURITY_RESET_KEYWORD) return false;
+    onResetSecurity();
+    setEnabled({ history: false, salesManagement: false, payroll: false });
+    setSharedPw("");
+    setSharedPwConfirm("");
+    setIndividualPw({ history: "", salesManagement: "", payroll: "" });
+    setError("");
+    setSaved("パスワードをリセットしました");
+    setShowResetModal(false);
+    return true;
+  };
+
+  return (
+    <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20 }}>
+      <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 18, lineHeight: 1.6 }}>
+        選んだ画面を開く際に、パスワード入力を必須にできます。設定はこの端末上でのみ有効です。
+      </div>
+
+      {SECURITY_SCREEN_ORDER.map((key) => (
+        <div
+          key={key}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{SECURITY_SCREEN_LABELS[key]}</div>
+          <button
+            onClick={() => toggle(key)}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 20,
+              fontSize: 12.5,
+              fontWeight: 700,
+              fontFamily: SANS,
+              cursor: "pointer",
+              minWidth: 84,
+              border: enabled[key] ? `1.5px solid ${COLORS.sage}` : `1.5px solid ${COLORS.line}`,
+              background: enabled[key] ? COLORS.sageBg : "transparent",
+              color: enabled[key] ? "#2c4a34" : COLORS.inkSoft,
+            }}
+          >
+            {enabled[key] ? "設定する" : "設定しない"}
+          </button>
+        </div>
+      ))}
+
+      {enabledKeys.length > 0 && (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: "20px 0 10px" }}>ロックのタイミング</div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+            <button onClick={() => setLockMode("session")} style={securitySegmentStyle(lockMode === "session")}>
+              アプリ起動中は初回のみ
+            </button>
+            <button onClick={() => setLockMode("always")} style={securitySegmentStyle(lockMode === "always")}>
+              タブを開くたび
+            </button>
+          </div>
+        </>
+      )}
+
+      {enabledKeys.length >= 2 && (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>パスワードの設定方法</div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            <button onClick={() => setMode("shared")} style={securitySegmentStyle(mode === "shared")}>共通のパスワードにする</button>
+            <button onClick={() => setMode("individual")} style={securitySegmentStyle(mode === "individual")}>画面ごとに個別に設定する</button>
+          </div>
+        </>
+      )}
+
+      {enabledKeys.length > 0 && (enabledKeys.length === 1 || mode === "shared") && (
+        <>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700, marginBottom: 6 }}>
+            {enabledKeys.length === 1 ? `${SECURITY_SCREEN_LABELS[enabledKeys[0]]}のパスワード` : "共通パスワード"}
+          </div>
+          <input
+            type="password"
+            value={sharedPw}
+            onChange={(e) => setSharedPw(e.target.value)}
+            placeholder="4桁以上の数字など"
+            style={securityInputStyle}
+          />
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700, margin: "12px 0 6px" }}>確認のためもう一度入力</div>
+          <input
+            type="password"
+            value={sharedPwConfirm}
+            onChange={(e) => setSharedPwConfirm(e.target.value)}
+            placeholder="もう一度入力"
+            style={securityInputStyle}
+          />
+        </>
+      )}
+
+      {enabledKeys.length >= 2 && mode === "individual" && enabledKeys.map((key) => (
+        <div key={key}>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700, margin: "12px 0 6px" }}>{SECURITY_SCREEN_LABELS[key]}のパスワード</div>
+          <input
+            type="password"
+            value={individualPw[key]}
+            onChange={(e) => setIndividualPw((p) => ({ ...p, [key]: e.target.value }))}
+            placeholder="4桁以上の数字など"
+            style={securityInputStyle}
+          />
+        </div>
+      ))}
+
+      {enabledKeys.length === 0 && (
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, textAlign: "center", padding: "14px 0", border: `1px dashed ${COLORS.line}`, borderRadius: 8, marginTop: 6 }}>
+          パスワードを設定する画面が選択されていません。
+        </div>
+      )}
+
+      {error && <div style={{ fontSize: 12, color: COLORS.brick, marginTop: 12 }}>{error}</div>}
+      {saved && <div style={{ fontSize: 12, color: COLORS.sage, marginTop: 12 }}>{saved}</div>}
+
+      <TicketButton variant="primary" onClick={handleSave} style={{ width: "100%", marginTop: 20 }}>保存</TicketButton>
+
+      <div style={{ height: 1, background: COLORS.line, margin: "24px 0" }} />
+
+      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>パスワードを忘れた場合</div>
+      <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 10, lineHeight: 1.6 }}>
+        リセット用のキーワードを入力すると、すべてのパスワード設定を解除できます。
+      </div>
+      <TicketButton
+        variant="danger"
+        onClick={() => setShowResetModal(true)}
+        style={{ width: "100%", background: "transparent" }}
+      >
+        パスワードをリセット
+      </TicketButton>
+
+      {showResetModal && (
+        <SecurityResetModal onCancel={() => setShowResetModal(false)} onConfirm={handleResetConfirm} />
+      )}
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
-function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData }) {
+function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData, onUpdateSecurity, onResetSecurity }) {
   const [tab, setTab] = useState("products");
   const [editing, setEditing] = useState(null); // product being edited, or {} for new
   const [serviceInput, setServiceInput] = useState(String(data.serviceChargeRate ?? 0));
@@ -1247,6 +1610,15 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
         const restored = parsed && parsed.data ? parsed.data : parsed; // 生データJSONも許容
         if (!restored || typeof restored !== "object" || !Array.isArray(restored.products)) {
           throw new Error("invalid");
+        }
+        // パスワードはMIRIN接頭辞を付けて保存する仕様のため、復元時に一度剥がしてから
+        // 付け直し、接頭辞のない古い形式のバックアップが来ても不整合にならないようにする
+        if (restored.security && restored.security.passwords) {
+          const normalized = {};
+          Object.entries(restored.security.passwords).forEach(([k, v]) => {
+            normalized[k] = v ? encodePassword(decodePassword(v)) : "";
+          });
+          restored.security = { ...restored.security, passwords: normalized };
         }
         onImportData(restored);
         setImportOk("データを復元しました");
@@ -1296,7 +1668,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
       <Header title="マスタ設定" onBack={onBack} />
 
       <div style={{ display: "flex", gap: 6, padding: "12px 20px", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper, overflowX: "auto" }}>
-        {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "data", label: "データ管理" }].map((t) => (
+        {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "password", label: "パスワード設定" }, { id: "data", label: "データ管理" }].map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -1466,6 +1838,14 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
 
             <TicketButton variant="primary" onClick={applyRates} style={{ width: "100%" }}>保存</TicketButton>
           </div>
+        )}
+
+        {tab === "password" && (
+          <PasswordSettingsPanel
+            security={data.security}
+            onUpdateSecurity={onUpdateSecurity}
+            onResetSecurity={onResetSecurity}
+          />
         )}
 
         {tab === "data" && (
@@ -1964,6 +2344,8 @@ function App() {
   const [now, setNow] = useState(Date.now());
   const [toast, setToast] = useState("");
   const [saveError, setSaveError] = useState(false);
+  const [unlockedTabs, setUnlockedTabs] = useState(() => new Set());
+  const [pendingLockTab, setPendingLockTab] = useState(null);
   const dataRef = useRef(null);
 
   // 初期読み込み(localStorage / オフライン対応)
@@ -2022,9 +2404,44 @@ function App() {
     );
   }
 
-  const handleSelectHomeTab = (tab) => {
+  const goToHomeTab = (tab) => {
     setHomeTab(tab);
     setScreen(tab === "seats" ? "top" : tab);
+  };
+
+  const handleSelectHomeTab = (tab) => {
+    const security = data.security;
+    if (SECURITY_SCREEN_ORDER.includes(tab) && security.enabled[tab]) {
+      const needsCheck = security.lockMode === "always" || !unlockedTabs.has(tab);
+      if (needsCheck) {
+        setPendingLockTab(tab);
+        return;
+      }
+    }
+    goToHomeTab(tab);
+  };
+
+  const handleUnlockSuccess = () => {
+    const tab = pendingLockTab;
+    setUnlockedTabs((prev) => new Set(prev).add(tab));
+    setPendingLockTab(null);
+    goToHomeTab(tab);
+  };
+
+  const onUpdateSecurity = (patch) => {
+    persist({ ...dataRef.current, security: { ...dataRef.current.security, ...patch } });
+  };
+
+  const onResetSecurity = () => {
+    persist({
+      ...dataRef.current,
+      security: {
+        ...dataRef.current.security,
+        enabled: { history: false, salesManagement: false, payroll: false },
+        passwords: { history: "", salesManagement: "", payroll: "" },
+      },
+    });
+    setUnlockedTabs(new Set());
   };
 
   const onUpdatePayroll = (patch) => {
@@ -2164,6 +2581,8 @@ function App() {
           onUpdateSeatName={(n, name) => persist({ ...dataRef.current, seatNames: { ...dataRef.current.seatNames, [n]: name } })}
           onUpdateRates={(service, tax) => persist({ ...dataRef.current, serviceChargeRate: service, taxRate: tax })}
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
+          onUpdateSecurity={onUpdateSecurity}
+          onResetSecurity={onResetSecurity}
         />
       )}
 
@@ -2219,6 +2638,15 @@ function App() {
 
       {guestModalSeat !== null && (
         <GuestCountModal seatNum={guestModalSeat} onConfirm={handleConfirmGuests} onCancel={() => setGuestModalSeat(null)} />
+      )}
+
+      {pendingLockTab && (
+        <PasswordPromptModal
+          label={SECURITY_SCREEN_LABELS[pendingLockTab]}
+          stored={data.security.passwords[pendingLockTab]}
+          onCancel={() => setPendingLockTab(null)}
+          onSuccess={handleUnlockSuccess}
+        />
       )}
 
       <Toast message={toast} />
