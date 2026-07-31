@@ -649,11 +649,273 @@ function DailySummaryPanel({ data }) {
 }
 
 /* ---------------------------------------------------------
+   集計グラフ(日毎/月毎の支払い方法別 積み上げグラフ)
+--------------------------------------------------------- */
+const PAYMENT_METHOD_ORDER = ["cash", "card", "paypay", "onAccount"];
+const PAYMENT_METHOD_LABELS = { cash: "現金", card: "カード", paypay: "PayPay", onAccount: "売掛" };
+const PAYMENT_METHOD_COLORS = { cash: COLORS.teal, card: COLORS.sage, paypay: COLORS.amber, onAccount: COLORS.brick };
+
+const graphDateInputStyle = {
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: `1.5px solid ${COLORS.line}`,
+  fontFamily: MONO,
+  fontSize: 13,
+  color: COLORS.ink,
+  background: "#fff",
+};
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return toDateInputValue(d);
+}
+
+function daysBetween(fromDate, toDate) {
+  const a = new Date(fromDate + "T00:00:00");
+  const b = new Date(toDate + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
+
+function currentMonthValue() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function addMonths(monthStr, n) {
+  const [y, m] = monthStr.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  const ny = Math.floor(total / 12);
+  const nm = ((total % 12) + 12) % 12;
+  return `${ny}-${String(nm + 1).padStart(2, "0")}`;
+}
+
+function monthDiff(fromMonth, toMonth) {
+  const [ay, am] = fromMonth.split("-").map(Number);
+  const [by, bm] = toMonth.split("-").map(Number);
+  return (by - ay) * 12 + (bm - am);
+}
+
+function emptyPaymentTotals() {
+  return { cash: 0, card: 0, paypay: 0, onAccount: 0 };
+}
+
+function aggregateSalesByDay(salesHistory, fromDate, toDate) {
+  const totals = new Map();
+  salesHistory.forEach((s) => {
+    const key = toDateInputValue(s.endTime);
+    if (key < fromDate || key > toDate) return;
+    const cur = totals.get(key) || emptyPaymentTotals();
+    cur.cash += s.payments?.cash || 0;
+    cur.card += s.payments?.card || 0;
+    cur.paypay += s.payments?.paypay || 0;
+    cur.onAccount += s.payments?.onAccount || 0;
+    totals.set(key, cur);
+  });
+  const points = [];
+  for (let key = fromDate; key <= toDate; key = addDays(key, 1)) {
+    points.push({ key, label: key.slice(5).replace("-", "/"), ...(totals.get(key) || emptyPaymentTotals()) });
+  }
+  return points;
+}
+
+function aggregateSalesByMonth(salesHistory, fromMonth, toMonth) {
+  const totals = new Map();
+  salesHistory.forEach((s) => {
+    const d = new Date(s.endTime);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (key < fromMonth || key > toMonth) return;
+    const cur = totals.get(key) || emptyPaymentTotals();
+    cur.cash += s.payments?.cash || 0;
+    cur.card += s.payments?.card || 0;
+    cur.paypay += s.payments?.paypay || 0;
+    cur.onAccount += s.payments?.onAccount || 0;
+    totals.set(key, cur);
+  });
+  const points = [];
+  for (let key = fromMonth; key <= toMonth; key = addMonths(key, 1)) {
+    points.push({ key, label: key, ...(totals.get(key) || emptyPaymentTotals()) });
+  }
+  return points;
+}
+
+function drawPaymentChart(canvas, { points, width, height }) {
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, width, height);
+  if (points.length === 0) return;
+
+  const padding = { top: 16, right: 16, bottom: 34, left: 74 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+
+  const totals = points.map((p) => PAYMENT_METHOD_ORDER.reduce((sum, k) => sum + p[k], 0));
+  const maxVal = Math.max(1, ...totals);
+
+  ctx.strokeStyle = COLORS.line;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, padding.top);
+  ctx.lineTo(padding.left, padding.top + chartH);
+  ctx.lineTo(padding.left + chartW, padding.top + chartH);
+  ctx.stroke();
+
+  const ySteps = 4;
+  ctx.font = "11px " + SANS;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i <= ySteps; i++) {
+    const v = (maxVal / ySteps) * i;
+    const y = padding.top + chartH - (chartH * i) / ySteps;
+    ctx.fillStyle = COLORS.inkSoft;
+    ctx.fillText(Math.round(v).toLocaleString("ja-JP"), padding.left - 8, y);
+    ctx.strokeStyle = "rgba(91,100,89,0.15)";
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + chartW, y);
+    ctx.stroke();
+  }
+
+  const n = points.length;
+  const slot = chartW / n;
+  const barWidth = Math.min(40, slot * 0.6);
+
+  points.forEach((p, i) => {
+    const cx = padding.left + slot * i + slot / 2;
+    let yCursor = padding.top + chartH;
+    PAYMENT_METHOD_ORDER.forEach((k) => {
+      const val = p[k];
+      const barH = (val / maxVal) * chartH;
+      ctx.fillStyle = PAYMENT_METHOD_COLORS[k];
+      ctx.fillRect(cx - barWidth / 2, yCursor - barH, barWidth, barH);
+      yCursor -= barH;
+    });
+
+    ctx.fillStyle = COLORS.inkSoft;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = "11px " + SANS;
+    ctx.fillText(p.label, cx, padding.top + chartH + 8);
+  });
+}
+
+function AggregationGraphPanel({ data }) {
+  const isNarrow = useMediaQuery("(max-width: 720px)");
+  const today = toDateInputValue(new Date());
+  const curMonth = currentMonthValue();
+
+  const [granularity, setGranularity] = useState("daily"); // daily | monthly
+  const [dailyFrom, setDailyFrom] = useState(addDays(today, -7));
+  const [dailyTo, setDailyTo] = useState(today);
+  const [monthlyFrom, setMonthlyFrom] = useState(addMonths(curMonth, -5));
+  const [monthlyTo, setMonthlyTo] = useState(curMonth);
+
+  const DAILY_MAX_DAYS = 92; // 約3ヶ月
+  const MONTHLY_MAX_MONTHS = 35; // 3年(36ヶ月)未満に収める
+
+  const handleDailyFromChange = (v) => {
+    let to = dailyTo;
+    if (v > to) to = v;
+    if (daysBetween(v, to) > DAILY_MAX_DAYS) to = addDays(v, DAILY_MAX_DAYS);
+    setDailyFrom(v);
+    setDailyTo(to);
+  };
+  const handleDailyToChange = (v) => {
+    let from = dailyFrom;
+    if (v < from) from = v;
+    if (daysBetween(from, v) > DAILY_MAX_DAYS) from = addDays(v, -DAILY_MAX_DAYS);
+    setDailyTo(v);
+    setDailyFrom(from);
+  };
+  const handleMonthlyFromChange = (v) => {
+    let to = monthlyTo;
+    if (v > to) to = v;
+    if (monthDiff(v, to) > MONTHLY_MAX_MONTHS) to = addMonths(v, MONTHLY_MAX_MONTHS);
+    setMonthlyFrom(v);
+    setMonthlyTo(to);
+  };
+  const handleMonthlyToChange = (v) => {
+    let from = monthlyFrom;
+    if (v < from) from = v;
+    if (monthDiff(from, v) > MONTHLY_MAX_MONTHS) from = addMonths(v, -MONTHLY_MAX_MONTHS);
+    setMonthlyTo(v);
+    setMonthlyFrom(from);
+  };
+
+  const points =
+    granularity === "daily"
+      ? aggregateSalesByDay(data.salesHistory, dailyFrom, dailyTo)
+      : aggregateSalesByMonth(data.salesHistory, monthlyFrom, monthlyTo);
+
+  const canvasRef = useRef(null);
+  const minSlot = 44;
+  const baseWidth = isNarrow ? 560 : 860;
+  const width = Math.max(baseWidth, points.length * minSlot);
+  const height = 260;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    drawPaymentChart(canvas, { points, width, height });
+  }, [points, width, height]);
+
+  const grandTotals = PAYMENT_METHOD_ORDER.reduce((acc, k) => {
+    acc[k] = points.reduce((sum, p) => sum + p[k], 0);
+    return acc;
+  }, {});
+  const grandSum = PAYMENT_METHOD_ORDER.reduce((sum, k) => sum + grandTotals[k], 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 10 }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setGranularity("daily")} style={salesTabPillStyle(granularity === "daily")}>日毎</button>
+          <button onClick={() => setGranularity("monthly")} style={salesTabPillStyle(granularity === "monthly")}>月毎</button>
+        </div>
+
+        {granularity === "daily" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="date" value={dailyFrom} onChange={(e) => handleDailyFromChange(e.target.value)} style={graphDateInputStyle} />
+            <span style={{ color: COLORS.inkSoft, fontSize: 13 }}>〜</span>
+            <input type="date" value={dailyTo} onChange={(e) => handleDailyToChange(e.target.value)} style={graphDateInputStyle} />
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="month" value={monthlyFrom} onChange={(e) => handleMonthlyFromChange(e.target.value)} style={graphDateInputStyle} />
+            <span style={{ color: COLORS.inkSoft, fontSize: 13 }}>〜</span>
+            <input type="month" value={monthlyTo} onChange={(e) => handleMonthlyToChange(e.target.value)} style={graphDateInputStyle} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ fontSize: 11, color: COLORS.inkSoft, marginBottom: 16 }}>
+        {granularity === "daily" ? "※期間は最大3ヶ月まで指定できます" : "※期間は最大3年まで指定できます"}
+      </div>
+
+      <div style={{ overflowX: "auto", marginBottom: 8 }}>
+        <canvas ref={canvasRef} width={width} height={height} style={{ display: "block" }} />
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, margin: "10px 0 4px" }}>
+        {PAYMENT_METHOD_ORDER.map((k) => (
+          <div key={k} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: PAYMENT_METHOD_COLORS[k], display: "inline-block" }} />
+            <span style={{ color: COLORS.inkSoft }}>{PAYMENT_METHOD_LABELS[k]}</span>
+            <span style={{ fontFamily: MONO, color: COLORS.ink, fontWeight: 700 }}>{formatYen(grandTotals[k])}</span>
+          </div>
+        ))}
+        <div style={{ fontFamily: MONO, fontWeight: 700, color: COLORS.teal }}>合計 {formatYen(grandSum)}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
    売上管理画面(トップレベル)
 --------------------------------------------------------- */
 const SALES_MANAGEMENT_TABS = [
   { id: "entry", label: "入出金入力" },
   { id: "daily", label: "日次集計" },
+  { id: "chart", label: "集計グラフ" },
 ];
 
 function SalesManagementScreen({ data, onUpdateCashFlow, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
@@ -679,6 +941,7 @@ function SalesManagementScreen({ data, onUpdateCashFlow, onOpenSettings, activeH
       <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
         {tab === "entry" && <CashFlowEntryPanel cashFlow={data.cashFlow} onUpdateCashFlow={onUpdateCashFlow} />}
         {tab === "daily" && <DailySummaryPanel data={data} />}
+        {tab === "chart" && <AggregationGraphPanel data={data} />}
       </div>
     </div>
   );
