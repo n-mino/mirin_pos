@@ -178,7 +178,7 @@ const STORAGE_KEY = "pos-app-data-v1";
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/07/31 17:00";
+const APP_LAST_UPDATED = "2026/07/31 17:20";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -2589,6 +2589,18 @@ function App() {
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(t);
+  }, []);
+
+  // ブラウザの戻る/進むボタン対策。画面遷移はReact内部のstateのみで行い
+  // ブラウザ履歴(URL)は使わない構成のため、戻る操作でアプリ自体から
+  // 抜けてしまわないよう、履歴が動くたびに同じURLを積み直して無効化する。
+  useEffect(() => {
+    const trapHistory = () => {
+      window.history.pushState(null, "", window.location.href);
+    };
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", trapHistory);
+    return () => window.removeEventListener("popstate", trapHistory);
   }, []);
 
   const persist = useCallback(async (newData) => {
