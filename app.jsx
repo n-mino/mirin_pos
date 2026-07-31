@@ -178,7 +178,7 @@ const STORAGE_KEY = "pos-app-data-v1";
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/07/31 16:36";
+const APP_LAST_UPDATED = "2026/07/31 17:00";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -2592,13 +2592,14 @@ function App() {
   }, []);
 
   const persist = useCallback(async (newData) => {
-    setData(newData);
-    dataRef.current = newData;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      setData(newData);
+      dataRef.current = newData;
       setSaveError(false);
     } catch (e) {
       // 容量超過(QuotaExceededError)などはここに来る
+      // localStorage失敗時は state を変更しない(UIと永続化の整合性を保つ)
       setSaveError(true);
     }
   }, []);
