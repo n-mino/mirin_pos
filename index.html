@@ -58,9 +58,11 @@
     background: #EFEBE2;
   }
   /* アドレスバーの出し引きでビューポート高さが変動する端末でも
-     コンテンツが隠れないよう、対応ブラウザでは動的ビューポート単位を使う */
+     コンテンツが隠れないよう、対応ブラウザでは動的ビューポート単位を使う。
+     11pxはapp.jsxのHEADER_CLOCK_FONT_SIZEと合わせること(タブレットの
+     システム時計とアプリのヘッダー時計が重ならないよう下にずらす分)。 */
   @supports (height: 100dvh) {
-    .pos-app-shell { height: 100dvh !important; }
+    .pos-app-shell { height: calc(100dvh - 11px) !important; }
   }
 </style>
 </head>

@@ -175,10 +175,15 @@ const SANS = "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', s
 
 const STORAGE_KEY = "pos-app-data-v1";
 
+// ヘッダーの時計表示のフォントサイズ(px)。タブレットのシステム時計と見た目上
+// 重なってしまうため、アプリ全体をこの分だけ下にずらす(このファイル内の
+// pos-app-shellのmarginTop/heightと、index.html内の対応するCSSで使用)。
+const HEADER_CLOCK_FONT_SIZE = 11;
+
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/07/31 18:45";
+const APP_LAST_UPDATED = "2026/07/31 19:10";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -505,7 +510,7 @@ function Header({ title, onBack, right }) {
           </button>
         )}
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 11, letterSpacing: 0.5, opacity: 0.65, fontFamily: MONO, whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: HEADER_CLOCK_FONT_SIZE, letterSpacing: 0.5, opacity: 0.65, fontFamily: MONO, whiteSpace: "nowrap" }}>
             <HeaderClock />
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: DISPLAY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -2770,8 +2775,9 @@ function App() {
         fontFamily: SANS,
         background: COLORS.bg,
         color: COLORS.ink,
-        height: "100vh",
-        maxHeight: 780,
+        marginTop: HEADER_CLOCK_FONT_SIZE,
+        height: `calc(100vh - ${HEADER_CLOCK_FONT_SIZE}px)`,
+        maxHeight: 780 - HEADER_CLOCK_FONT_SIZE,
         display: "flex",
         flexDirection: "column",
         borderRadius: 10,
