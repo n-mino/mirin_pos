@@ -178,7 +178,7 @@ const STORAGE_KEY = "pos-app-data-v1";
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/07/31 17:20";
+const APP_LAST_UPDATED = "2026/07/31 18:45";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -1656,6 +1656,24 @@ function GuideItem({ label, children }) {
 function UserGuidePanel() {
   return (
     <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          background: COLORS.brickBg,
+          border: `1.5px solid ${COLORS.brick}`,
+          borderRadius: 8,
+          padding: "12px 14px",
+          marginBottom: 18,
+        }}
+      >
+        <AlertCircle size={16} color={COLORS.brick} style={{ flexShrink: 0, marginTop: 1 }} />
+        <div style={{ fontSize: 12.5, color: COLORS.brick, lineHeight: 1.7, fontWeight: 600 }}>
+          ・このアプリを使用中はブラウザの「戻る」はクリックしないでください。
+        </div>
+      </div>
+
       <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 24, lineHeight: 1.7 }}>
         このアプリの基本的な使い方をまとめています。データはこの端末内にのみ保存されるため、機種変更や故障に備えて「データ管理」から定期的にバックアップを書き出してください。
       </div>
