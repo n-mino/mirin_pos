@@ -768,7 +768,7 @@ const PAYROLL_TABS = [
   { id: "employees", label: "アルバイトマスタ" },
 ];
 
-function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
+function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab, onSelectHomeTab, showToast }) {
   const [tab, setTab] = useState(PAYROLL_TABS[0].id);
   const [editingEmployee, setEditingEmployee] = useState(null); // null | {} | employee
   const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
@@ -792,9 +792,11 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
   };
 
   const saveShift = (shift) => {
-    const list = shift.id ? shifts.map((s) => (s.id === shift.id ? shift : s)) : [...shifts, { ...shift, id: uid("shift") }];
+    const isUpdate = !!shift.id;
+    const list = isUpdate ? shifts.map((s) => (s.id === shift.id ? shift : s)) : [...shifts, { ...shift, id: uid("shift") }];
     onUpdatePayroll({ shifts: list });
     setEditingShiftId(null);
+    showToast(isUpdate ? "更新しました" : "追加しました");
   };
 
   const deleteShift = (id) => {

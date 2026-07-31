@@ -360,6 +360,17 @@ function formatTimeShort(iso) {
   return `${h}:${min}`;
 }
 
+// ヘッダーに表示するシステム日時(YYYY/MM/DD HH:MM:SS)
+function formatFullDateTime(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const s = String(d.getSeconds()).padStart(2, "0");
+  return `${y}/${m}/${day} ${h}:${min}:${s}`;
+}
+
 // CSVセル内にカンマ・改行・ダブルクォートが含まれる場合に備えたエスケープ
 function csvEscape(value) {
   const str = value === null || value === undefined ? "" : String(value);
@@ -445,6 +456,15 @@ function TicketButton({ children, onClick, variant = "primary", style, disabled,
   );
 }
 
+function HeaderClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return formatFullDateTime(now);
+}
+
 function Header({ title, onBack, right }) {
   return (
     <div
@@ -479,8 +499,8 @@ function Header({ title, onBack, right }) {
           </button>
         )}
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2, opacity: 0.65, fontFamily: MONO }}>
-            SIMPLE POS
+          <div style={{ fontSize: 11, letterSpacing: 0.5, opacity: 0.65, fontFamily: MONO, whiteSpace: "nowrap" }}>
+            <HeaderClock />
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: DISPLAY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {title}
@@ -605,6 +625,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
           alignItems: "center",
           fontFamily: MONO,
           fontSize: 12,
+          fontWeight: 700,
           color: COLORS.inkSoft,
           borderBottom: `1px dashed ${COLORS.line}`,
           background: COLORS.paper,
@@ -837,7 +858,7 @@ function ConfirmModal({ title, message, confirmLabel = "OK", onConfirm, onCancel
 }
 
 // 対象画面(売上履歴・売上管理・アルバイト管理)を開く際のパスワード入力モーダル
-function PasswordPromptModal({ label, stored, onCancel, onSuccess }) {
+function PasswordPromptModal({ label, stored, title, message, onCancel, onSuccess }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
 
@@ -877,10 +898,10 @@ function PasswordPromptModal({ label, stored, onCancel, onSuccess }) {
           <Lock size={22} color={COLORS.sage} />
         </div>
         <div style={{ fontFamily: DISPLAY, fontSize: 17, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>
-          パスワードが必要です
+          {title || "パスワードが必要です"}
         </div>
         <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 20, lineHeight: 1.6 }}>
-          「{label}」を開くにはパスワードを入力してください。
+          {message || `「${label}」を開くにはパスワードを入力してください。`}
         </div>
         <input
           type="password"
@@ -1376,7 +1397,7 @@ const securityInputStyle = {
    パスワード設定パネル(マスタ設定内)
 --------------------------------------------------------- */
 function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) {
-  const [enabled, setEnabled] = useState({ ...security.enabled });
+  const [pendingEnable, setPendingEnable] = useState({});
   const [mode, setMode] = useState(security.mode || "shared");
   const [lockMode, setLockMode] = useState(security.lockMode || "session");
   const [sharedPw, setSharedPw] = useState("");
@@ -1385,11 +1406,13 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
+  const [removingKey, setRemovingKey] = useState(null);
 
-  const enabledKeys = SECURITY_SCREEN_ORDER.filter((k) => enabled[k]);
+  const pendingKeys = SECURITY_SCREEN_ORDER.filter((k) => pendingEnable[k]);
+  const anyActive = SECURITY_SCREEN_ORDER.some((k) => security.enabled[k]) || pendingKeys.length > 0;
 
-  const toggle = (key) => {
-    setEnabled((prev) => ({ ...prev, [key]: !prev[key] }));
+  const togglePending = (key) => {
+    setPendingEnable((prev) => ({ ...prev, [key]: !prev[key] }));
     setError("");
     setSaved("");
   };
@@ -1397,37 +1420,45 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
   const handleSave = () => {
     setError("");
     setSaved("");
+    if (pendingKeys.length === 0) return;
 
-    if (enabledKeys.length === 0) {
-      onUpdateSecurity({ enabled: { ...enabled }, mode, lockMode, passwords: { history: "", salesManagement: "", payroll: "" } });
-      setSaved("保存しました");
-      return;
-    }
+    const newPasswords = { ...security.passwords };
+    const newEnabled = { ...security.enabled };
 
-    const newPasswords = { history: "", salesManagement: "", payroll: "" };
-
-    if (enabledKeys.length === 1 || mode === "shared") {
+    if (pendingKeys.length === 1 || mode === "shared") {
       if (!sharedPw.trim()) { setError("パスワードを入力してください。"); return; }
       if (sharedPw !== sharedPwConfirm) { setError("パスワード(確認)が一致しません。"); return; }
-      enabledKeys.forEach((k) => { newPasswords[k] = encodePassword(sharedPw); });
+      pendingKeys.forEach((k) => { newPasswords[k] = encodePassword(sharedPw); newEnabled[k] = true; });
     } else {
-      for (const k of enabledKeys) {
+      for (const k of pendingKeys) {
         if (!individualPw[k]?.trim()) { setError(`${SECURITY_SCREEN_LABELS[k]}のパスワードを入力してください。`); return; }
       }
-      enabledKeys.forEach((k) => { newPasswords[k] = encodePassword(individualPw[k]); });
+      pendingKeys.forEach((k) => { newPasswords[k] = encodePassword(individualPw[k]); newEnabled[k] = true; });
     }
 
-    onUpdateSecurity({ enabled: { ...enabled }, mode, lockMode, passwords: newPasswords });
+    onUpdateSecurity({ enabled: newEnabled, mode, lockMode, passwords: newPasswords });
+    setPendingEnable({});
     setSharedPw("");
     setSharedPwConfirm("");
     setIndividualPw({ history: "", salesManagement: "", payroll: "" });
     setSaved("保存しました");
   };
 
+  const handleRemoveSuccess = () => {
+    const key = removingKey;
+    onUpdateSecurity({
+      enabled: { ...security.enabled, [key]: false },
+      passwords: { ...security.passwords, [key]: "" },
+    });
+    setRemovingKey(null);
+    setError("");
+    setSaved(`${SECURITY_SCREEN_LABELS[key]}のパスワードを解除しました`);
+  };
+
   const handleResetConfirm = (keyword) => {
     if (keyword !== SECURITY_RESET_KEYWORD) return false;
     onResetSecurity();
-    setEnabled({ history: false, salesManagement: false, payroll: false });
+    setPendingEnable({});
     setSharedPw("");
     setSharedPwConfirm("");
     setIndividualPw({ history: "", salesManagement: "", payroll: "" });
@@ -1443,33 +1474,60 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
         選んだ画面を開く際に、パスワード入力を必須にできます。設定はこの端末上でのみ有効です。
       </div>
 
-      {SECURITY_SCREEN_ORDER.map((key) => (
-        <div
-          key={key}
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}
-        >
-          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{SECURITY_SCREEN_LABELS[key]}</div>
-          <button
-            onClick={() => toggle(key)}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 20,
-              fontSize: 12.5,
-              fontWeight: 700,
-              fontFamily: SANS,
-              cursor: "pointer",
-              minWidth: 84,
-              border: enabled[key] ? `1.5px solid ${COLORS.sage}` : `1.5px solid ${COLORS.line}`,
-              background: enabled[key] ? COLORS.sageBg : "transparent",
-              color: enabled[key] ? "#2c4a34" : COLORS.inkSoft,
-            }}
+      {SECURITY_SCREEN_ORDER.map((key) => {
+        const isProtected = security.enabled[key];
+        const isPending = pendingEnable[key];
+        return (
+          <div
+            key={key}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}
           >
-            {enabled[key] ? "設定する" : "設定しない"}
-          </button>
-        </div>
-      ))}
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{SECURITY_SCREEN_LABELS[key]}</div>
+              {isProtected && <div style={{ fontSize: 11, color: COLORS.sage, marginTop: 2 }}>設定済み</div>}
+            </div>
+            {isProtected ? (
+              <button
+                onClick={() => setRemovingKey(key)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 20,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  fontFamily: SANS,
+                  cursor: "pointer",
+                  minWidth: 84,
+                  border: `1.5px solid ${COLORS.brick}`,
+                  background: "transparent",
+                  color: COLORS.brick,
+                }}
+              >
+                解除する
+              </button>
+            ) : (
+              <button
+                onClick={() => togglePending(key)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 20,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  fontFamily: SANS,
+                  cursor: "pointer",
+                  minWidth: 84,
+                  border: isPending ? `1.5px solid ${COLORS.sage}` : `1.5px solid ${COLORS.line}`,
+                  background: isPending ? COLORS.sageBg : "transparent",
+                  color: isPending ? "#2c4a34" : COLORS.inkSoft,
+                }}
+              >
+                設定する
+              </button>
+            )}
+          </div>
+        );
+      })}
 
-      {enabledKeys.length > 0 && (
+      {anyActive && (
         <>
           <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: "20px 0 10px" }}>ロックのタイミング</div>
           <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
@@ -1483,7 +1541,7 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
         </>
       )}
 
-      {enabledKeys.length >= 2 && (
+      {pendingKeys.length >= 2 && (
         <>
           <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>パスワードの設定方法</div>
           <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
@@ -1493,10 +1551,10 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
         </>
       )}
 
-      {enabledKeys.length > 0 && (enabledKeys.length === 1 || mode === "shared") && (
+      {pendingKeys.length > 0 && (pendingKeys.length === 1 || mode === "shared") && (
         <>
           <div style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700, marginBottom: 6 }}>
-            {enabledKeys.length === 1 ? `${SECURITY_SCREEN_LABELS[enabledKeys[0]]}のパスワード` : "共通パスワード"}
+            {pendingKeys.length === 1 ? `${SECURITY_SCREEN_LABELS[pendingKeys[0]]}のパスワード` : "共通パスワード"}
           </div>
           <input
             type="password"
@@ -1516,7 +1574,7 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
         </>
       )}
 
-      {enabledKeys.length >= 2 && mode === "individual" && enabledKeys.map((key) => (
+      {pendingKeys.length >= 2 && mode === "individual" && pendingKeys.map((key) => (
         <div key={key}>
           <div style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700, margin: "12px 0 6px" }}>{SECURITY_SCREEN_LABELS[key]}のパスワード</div>
           <input
@@ -1529,16 +1587,12 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
         </div>
       ))}
 
-      {enabledKeys.length === 0 && (
-        <div style={{ fontSize: 12, color: COLORS.inkSoft, textAlign: "center", padding: "14px 0", border: `1px dashed ${COLORS.line}`, borderRadius: 8, marginTop: 6 }}>
-          パスワードを設定する画面が選択されていません。
-        </div>
-      )}
-
       {error && <div style={{ fontSize: 12, color: COLORS.brick, marginTop: 12 }}>{error}</div>}
       {saved && <div style={{ fontSize: 12, color: COLORS.sage, marginTop: 12 }}>{saved}</div>}
 
-      <TicketButton variant="primary" onClick={handleSave} style={{ width: "100%", marginTop: 20 }}>保存</TicketButton>
+      <TicketButton variant="primary" onClick={handleSave} disabled={pendingKeys.length === 0} style={{ width: "100%", marginTop: 20 }}>
+        保存
+      </TicketButton>
 
       <div style={{ height: 1, background: COLORS.line, margin: "24px 0" }} />
 
@@ -1556,6 +1610,17 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
 
       {showResetModal && (
         <SecurityResetModal onCancel={() => setShowResetModal(false)} onConfirm={handleResetConfirm} />
+      )}
+
+      {removingKey && (
+        <PasswordPromptModal
+          label={SECURITY_SCREEN_LABELS[removingKey]}
+          stored={security.passwords[removingKey]}
+          title="パスワードの解除"
+          message={`「${SECURITY_SCREEN_LABELS[removingKey]}」の現在のパスワードを入力してください。`}
+          onCancel={() => setRemovingKey(null)}
+          onSuccess={handleRemoveSuccess}
+        />
       )}
     </div>
   );
@@ -1670,7 +1735,7 @@ function UserGuidePanel() {
 /* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
-function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData, onUpdateSecurity, onResetSecurity }) {
+function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData, onUpdateSecurity, onResetSecurity, showToast }) {
   const [tab, setTab] = useState("products");
   const [editing, setEditing] = useState(null); // product being edited, or {} for new
   const [serviceInput, setServiceInput] = useState(String(data.serviceChargeRate ?? 0));
@@ -1678,6 +1743,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const [importError, setImportError] = useState("");
   const [importOk, setImportOk] = useState("");
   const [storageEstimate, setStorageEstimate] = useState(null);
+  const [passwordTabUnlocked, setPasswordTabUnlocked] = useState(false);
+  const [pendingPasswordTab, setPendingPasswordTab] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -1685,6 +1752,14 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
       navigator.storage.estimate().then(setStorageEstimate).catch(() => {});
     }
   }, []);
+
+  const handleTabClick = (id) => {
+    if (id === "password" && !passwordTabUnlocked) {
+      setPendingPasswordTab(true);
+      return;
+    }
+    setTab(id);
+  };
 
   const exportData = () => {
     const payload = {
@@ -1767,6 +1842,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
     setServiceInput(String(service));
     setTaxInput(String(tax));
     onUpdateRates(service, tax);
+    showToast("保存しました");
   };
 
   return (
@@ -1777,7 +1853,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
         {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "password", label: "パスワード設定" }, { id: "data", label: "データ管理" }, { id: "help", label: "使用方法" }].map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => handleTabClick(t.id)}
             style={{
               padding: "8px 16px",
               borderRadius: 20,
@@ -2045,6 +2121,15 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
           categories={Array.from(new Set(data.products.map((p) => p.category)))}
           onCancel={() => setEditing(null)}
           onSave={saveProduct}
+        />
+      )}
+
+      {pendingPasswordTab && (
+        <PasswordPromptModal
+          label="パスワード設定"
+          stored={encodePassword("mirin")}
+          onCancel={() => setPendingPasswordTab(false)}
+          onSuccess={() => { setPasswordTabUnlocked(true); setPendingPasswordTab(false); setTab("password"); }}
         />
       )}
     </div>
@@ -2691,6 +2776,7 @@ function App() {
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
           onUpdateSecurity={onUpdateSecurity}
           onResetSecurity={onResetSecurity}
+          showToast={showToast}
         />
       )}
 
@@ -2721,6 +2807,7 @@ function App() {
           onOpenSettings={() => setScreen("settings")}
           activeHomeTab={homeTab}
           onSelectHomeTab={handleSelectHomeTab}
+          showToast={showToast}
         />
       )}
 
