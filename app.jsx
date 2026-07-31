@@ -225,6 +225,7 @@ function verifyPassword(enteredRaw, storedEncoded) {
 const SECURITY_SCREEN_ORDER = ["history", "salesManagement", "payroll"];
 const SECURITY_SCREEN_LABELS = { history: "売上履歴", salesManagement: "売上管理", payroll: "アルバイト管理" };
 const SECURITY_RESET_KEYWORD = "09044249596";
+const SETTINGS_ADMIN_PASSWORD = "mrn"; // 「パスワード設定」タブ・JSON書き出しを保護する固定パスワード
 
 function uid(prefix = "id") {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1745,6 +1746,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const [storageEstimate, setStorageEstimate] = useState(null);
   const [passwordTabUnlocked, setPasswordTabUnlocked] = useState(false);
   const [pendingPasswordTab, setPendingPasswordTab] = useState(false);
+  const [pendingExport, setPendingExport] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -2083,7 +2085,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
               <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 10 }}>
                 商品・座席・売上履歴・設定をすべて含むJSONファイルをダウンロードします。
               </div>
-              <TicketButton variant="primary" onClick={exportData} style={{ width: "100%" }}>
+              <TicketButton variant="primary" onClick={() => setPendingExport(true)} style={{ width: "100%" }}>
                 全データをJSONで書き出す
               </TicketButton>
             </div>
@@ -2127,9 +2129,18 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
       {pendingPasswordTab && (
         <PasswordPromptModal
           label="パスワード設定"
-          stored={encodePassword("mirin")}
+          stored={encodePassword(SETTINGS_ADMIN_PASSWORD)}
           onCancel={() => setPendingPasswordTab(false)}
           onSuccess={() => { setPasswordTabUnlocked(true); setPendingPasswordTab(false); setTab("password"); }}
+        />
+      )}
+
+      {pendingExport && (
+        <PasswordPromptModal
+          label="全データをJSONで書き出す"
+          stored={encodePassword(SETTINGS_ADMIN_PASSWORD)}
+          onCancel={() => setPendingExport(false)}
+          onSuccess={() => { setPendingExport(false); exportData(); }}
         />
       )}
     </div>
