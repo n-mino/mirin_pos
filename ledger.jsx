@@ -697,7 +697,7 @@ function monthDiff(fromMonth, toMonth) {
 }
 
 function emptyPaymentTotals() {
-  return { cash: 0, card: 0, paypay: 0, onAccount: 0 };
+  return { cash: 0, card: 0, paypay: 0, onAccount: 0, guests: 0 };
 }
 
 function aggregateSalesByDay(salesHistory, fromDate, toDate) {
@@ -710,6 +710,7 @@ function aggregateSalesByDay(salesHistory, fromDate, toDate) {
     cur.card += s.payments?.card || 0;
     cur.paypay += s.payments?.paypay || 0;
     cur.onAccount += s.payments?.onAccount || 0;
+    cur.guests += s.guests || 0;
     totals.set(key, cur);
   });
   const points = [];
@@ -730,6 +731,7 @@ function aggregateSalesByMonth(salesHistory, fromMonth, toMonth) {
     cur.card += s.payments?.card || 0;
     cur.paypay += s.payments?.paypay || 0;
     cur.onAccount += s.payments?.onAccount || 0;
+    cur.guests += s.guests || 0;
     totals.set(key, cur);
   });
   const points = [];
@@ -739,17 +741,20 @@ function aggregateSalesByMonth(salesHistory, fromMonth, toMonth) {
   return points;
 }
 
+const GUEST_LINE_COLOR = COLORS.inkSoft;
+
 function drawPaymentChart(canvas, { points, width, height }) {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, width, height);
   if (points.length === 0) return;
 
-  const padding = { top: 16, right: 16, bottom: 34, left: 74 };
+  const padding = { top: 16, right: 46, bottom: 34, left: 74 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
   const totals = points.map((p) => PAYMENT_METHOD_ORDER.reduce((sum, k) => sum + p[k], 0));
   const maxVal = Math.max(1, ...totals);
+  const maxGuests = Math.max(1, ...points.map((p) => p.guests));
 
   ctx.strokeStyle = COLORS.line;
   ctx.lineWidth = 1;
@@ -757,17 +762,24 @@ function drawPaymentChart(canvas, { points, width, height }) {
   ctx.moveTo(padding.left, padding.top);
   ctx.lineTo(padding.left, padding.top + chartH);
   ctx.lineTo(padding.left + chartW, padding.top + chartH);
+  ctx.moveTo(padding.left + chartW, padding.top);
+  ctx.lineTo(padding.left + chartW, padding.top + chartH);
   ctx.stroke();
 
   const ySteps = 4;
   ctx.font = "11px " + SANS;
-  ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   for (let i = 0; i <= ySteps; i++) {
-    const v = (maxVal / ySteps) * i;
     const y = padding.top + chartH - (chartH * i) / ySteps;
+
+    ctx.textAlign = "right";
     ctx.fillStyle = COLORS.inkSoft;
-    ctx.fillText(Math.round(v).toLocaleString("ja-JP"), padding.left - 8, y);
+    ctx.fillText(Math.round((maxVal / ySteps) * i).toLocaleString("ja-JP"), padding.left - 8, y);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = GUEST_LINE_COLOR;
+    ctx.fillText(Math.round((maxGuests / ySteps) * i).toLocaleString("ja-JP"), padding.left + chartW + 8, y);
+
     ctx.strokeStyle = "rgba(91,100,89,0.15)";
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
@@ -795,6 +807,30 @@ function drawPaymentChart(canvas, { points, width, height }) {
     ctx.textBaseline = "top";
     ctx.font = "11px " + SANS;
     ctx.fillText(p.label, cx, padding.top + chartH + 8);
+  });
+
+  // 人数の折れ線(右軸)
+  ctx.strokeStyle = GUEST_LINE_COLOR;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const cx = padding.left + slot * i + slot / 2;
+    const cy = padding.top + chartH - (p.guests / maxGuests) * chartH;
+    if (i === 0) ctx.moveTo(cx, cy);
+    else ctx.lineTo(cx, cy);
+  });
+  ctx.stroke();
+
+  points.forEach((p, i) => {
+    const cx = padding.left + slot * i + slot / 2;
+    const cy = padding.top + chartH - (p.guests / maxGuests) * chartH;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.paper;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = GUEST_LINE_COLOR;
+    ctx.stroke();
   });
 }
 
@@ -863,6 +899,7 @@ function AggregationGraphPanel({ data }) {
     return acc;
   }, {});
   const grandSum = PAYMENT_METHOD_ORDER.reduce((sum, k) => sum + grandTotals[k], 0);
+  const grandGuests = points.reduce((sum, p) => sum + p.guests, 0);
 
   return (
     <div>
@@ -904,6 +941,13 @@ function AggregationGraphPanel({ data }) {
           </div>
         ))}
         <div style={{ fontFamily: MONO, fontWeight: 700, color: COLORS.teal }}>合計 {formatYen(grandSum)}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 8, borderLeft: `1px solid ${COLORS.line}` }}>
+          <span style={{ width: 14, height: 0, borderTop: `2px solid ${GUEST_LINE_COLOR}`, display: "inline-block", position: "relative" }}>
+            <span style={{ position: "absolute", top: -3, left: 5, width: 6, height: 6, borderRadius: "50%", background: COLORS.paper, border: `2px solid ${GUEST_LINE_COLOR}`, boxSizing: "border-box" }} />
+          </span>
+          <span style={{ color: COLORS.inkSoft }}>人数(右軸)</span>
+          <span style={{ fontFamily: MONO, color: COLORS.ink, fontWeight: 700 }}>{grandGuests.toLocaleString("ja-JP")}名</span>
+        </div>
       </div>
     </div>
   );
