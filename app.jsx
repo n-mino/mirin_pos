@@ -175,6 +175,11 @@ const SANS = "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', s
 
 const STORAGE_KEY = "pos-app-data-v1";
 
+// コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
+// コードを変更するたびに、この値を手動で現在日時に更新すること
+// (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
+const APP_LAST_UPDATED = "2026/07/31 16:04";
+
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
   { id: "p2", name: "ハイボール", price: 500, category: "ドリンク" },
@@ -1872,6 +1877,9 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             {t.label}
           </button>
         ))}
+        <div style={{ marginLeft: "auto", flexShrink: 0, alignSelf: "center", paddingLeft: 12, fontSize: 11, fontFamily: MONO, color: COLORS.inkSoft, whiteSpace: "nowrap" }}>
+          最終更新: {APP_LAST_UPDATED}
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20, maxWidth: 560, margin: "0 auto", width: "100%" }}>
