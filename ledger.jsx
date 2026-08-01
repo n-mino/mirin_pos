@@ -406,7 +406,13 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
     .remaining { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; margin-top: 8px; padding-top: 8px; border-top: 1.5px solid #20291F; }
     .cols { display: flex; gap: 24px; }
     .cols > div { flex: 1; min-width: 0; }
-    @media print { body { padding: 8px; } }
+    .no-print { margin-bottom: 18px; }
+    .no-print button {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+      font-size: 13px; font-weight: 700; color: #1D4E4B; background: #E4EEE3;
+      border: 1.5px solid #1D4E4B; border-radius: 8px; padding: 10px 16px; cursor: pointer;
+    }
+    @media print { body { padding: 8px; } .no-print { display: none; } }
   `;
 
   const summaryRowsHtml = summaryRows.map((r) => `
@@ -472,6 +478,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   const html = `<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8"><title>日次集計_${escapeHtml(targetDate)}</title><style>${style}</style></head>
 <body>
+  <div class="no-print"><button onclick="window.close()">← 閉じてPOS画面に戻る</button></div>
   <h1>日次集計</h1>
   <div class="sub">対象日: ${escapeHtml(targetDate)}</div>
 
