@@ -183,7 +183,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/01 14:35";
+const APP_LAST_UPDATED = "2026/08/01 15:20";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -211,10 +211,10 @@ function defaultData() {
     payroll: { employees: [], shifts: [] },
     cashFlow: { records: {} }, // 日付(YYYY-MM-DD) -> { expenses:[], income:[] }
     security: {
-      enabled: { history: false, salesManagement: false, payroll: false },
+      enabled: { salesManagement: false, payroll: false },
       mode: "shared", // "shared" | "individual"(2画面以上選択時のみ意味を持つ)
       lockMode: "session", // "session"(起動中は初回のみ) | "always"(タブを開くたび)
-      passwords: { history: "", salesManagement: "", payroll: "" }, // PASSWORD_PREFIXを付与して保存
+      passwords: { salesManagement: "", payroll: "" }, // PASSWORD_PREFIXを付与して保存
     },
   };
 }
@@ -232,8 +232,8 @@ function verifyPassword(enteredRaw, storedEncoded) {
   return !!storedEncoded && encodePassword(enteredRaw) === storedEncoded;
 }
 
-const SECURITY_SCREEN_ORDER = ["history", "salesManagement", "payroll"];
-const SECURITY_SCREEN_LABELS = { history: "売上履歴", salesManagement: "売上管理", payroll: "アルバイト管理" };
+const SECURITY_SCREEN_ORDER = ["salesManagement", "payroll"];
+const SECURITY_SCREEN_LABELS = { salesManagement: "売上管理", payroll: "アルバイト管理" };
 const SECURITY_RESET_KEYWORD = "09044249596";
 const SETTINGS_ADMIN_PASSWORD = "mrn"; // 「パスワード設定」タブ・JSON書き出しを保護する固定パスワード
 
@@ -411,7 +411,7 @@ function csvTimestamp() {
   return new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 }
 
-// 売上履歴(売上履歴画面・マスタ設定の全件書き出し双方で使う行データ)
+// 売上履歴(売上管理内の売上履歴タブ・マスタ設定の全件書き出し双方で使う行データ)
 function salesHistoryToCsvRows(salesHistory) {
   const rows = [["会計ID", "日時", "座席", "人数", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
   (salesHistory || []).forEach((s) => {
@@ -549,7 +549,6 @@ function HeaderIconButton({ icon: Icon, onClick, title }) {
 
 const HOME_TABS = [
   { id: "seats", label: "座席一覧" },
-  { id: "history", label: "売上履歴" },
   { id: "salesManagement", label: "売上管理" },
   { id: "payroll", label: "アルバイト管理" },
 ];
@@ -868,7 +867,7 @@ function ConfirmModal({ title, message, confirmLabel = "OK", onConfirm, onCancel
   );
 }
 
-// 対象画面(売上履歴・売上管理・アルバイト管理)を開く際のパスワード入力モーダル
+// 対象画面(売上管理・アルバイト管理)を開く際のパスワード入力モーダル
 function PasswordPromptModal({ label, stored, title, message, onCancel, onSuccess }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
@@ -1413,7 +1412,7 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
   const [lockMode, setLockMode] = useState(security.lockMode || "session");
   const [sharedPw, setSharedPw] = useState("");
   const [sharedPwConfirm, setSharedPwConfirm] = useState("");
-  const [individualPw, setIndividualPw] = useState({ history: "", salesManagement: "", payroll: "" });
+  const [individualPw, setIndividualPw] = useState({ salesManagement: "", payroll: "" });
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
@@ -1451,7 +1450,7 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
     setPendingEnable({});
     setSharedPw("");
     setSharedPwConfirm("");
-    setIndividualPw({ history: "", salesManagement: "", payroll: "" });
+    setIndividualPw({ salesManagement: "", payroll: "" });
     setSaved("保存しました");
   };
 
@@ -1472,7 +1471,7 @@ function PasswordSettingsPanel({ security, onUpdateSecurity, onResetSecurity }) 
     setPendingEnable({});
     setSharedPw("");
     setSharedPwConfirm("");
-    setIndividualPw({ history: "", salesManagement: "", payroll: "" });
+    setIndividualPw({ salesManagement: "", payroll: "" });
     setError("");
     setSaved("パスワードをリセットしました");
     setShowResetModal(false);
@@ -1692,16 +1691,10 @@ function UserGuidePanel() {
         </GuideItem>
       </GuideSection>
 
-      <GuideSection title="② 売上履歴">
-        <GuideItem label="絞り込み">
-          「本日のみ」「すべて」、または日付を指定して過去の会計記録を一覧表示できます。行をタップすると明細(注文内容)を確認できます。
+      <GuideSection title="② 売上管理">
+        <GuideItem label="売上履歴">
+          「本日のみ」「すべて」、または日付を指定して過去の会計記録を一覧表示できます。行をタップすると明細(注文内容)を確認できます。画面右上の「CSVダウンロード」で、表示中の絞り込み条件のままCSVファイルとして書き出せます。
         </GuideItem>
-        <GuideItem label="CSVダウンロード">
-          画面右上の「CSVダウンロード」で、表示中の絞り込み条件のままCSVファイルとして書き出せます。
-        </GuideItem>
-      </GuideSection>
-
-      <GuideSection title="③ 売上管理">
         <GuideItem label="入出金入力">
           日付ごとに、レジからの出金(仕入れなど)・入金(釣銭準備金など)を「摘要」「金額」で記録します。「+項目追加」で行を増やせます。
         </GuideItem>
@@ -1713,7 +1706,7 @@ function UserGuidePanel() {
         </GuideItem>
       </GuideSection>
 
-      <GuideSection title="④ アルバイト管理">
+      <GuideSection title="③ アルバイト管理">
         <GuideItem label="勤怠入力">
           従業員・日付・開始/終了時刻(15分単位)を入力して記録します。日給を入力した場合は、時給×時間の計算より日給が優先されます。
         </GuideItem>
@@ -1728,7 +1721,7 @@ function UserGuidePanel() {
         </GuideItem>
       </GuideSection>
 
-      <GuideSection title="⑤ マスタ設定">
+      <GuideSection title="④ マスタ設定">
         <GuideItem label="商品管理">
           商品の名称・価格・カテゴリを登録します。時間帯によって価格を変える「時間帯価格」も設定できます。
         </GuideItem>
@@ -1739,7 +1732,7 @@ function UserGuidePanel() {
           サービス料率・消費税率を設定します。会計時は「小計→サービス料→消費税」の順で自動計算されます。
         </GuideItem>
         <GuideItem label="パスワード設定">
-          売上履歴・売上管理・アルバイト管理の3画面それぞれにパスワードを設定できます。2画面以上に設定する場合は「共通のパスワード」か「画面ごとに個別」かを選べます。「ロックのタイミング」では、アプリ起動中は初回のみ確認するか、画面を開くたび毎回確認するかを選べます。パスワードを忘れた場合は、この画面下部の「パスワードをリセット」からリセット用のキーワードを入力するとすべての設定を解除できます。キーワードは管理者に問い合わせてください。
+          売上管理・アルバイト管理の2画面それぞれにパスワードを設定できます(売上履歴は売上管理内のタブのため、売上管理のパスワードが適用されます)。両方に設定する場合は「共通のパスワード」か「画面ごとに個別」かを選べます。「ロックのタイミング」では、アプリ起動中は初回のみ確認するか、画面を開くたび毎回確認するかを選べます。パスワードを忘れた場合は、この画面下部の「パスワードをリセット」からリセット用のキーワードを入力するとすべての設定を解除できます。キーワードは管理者に問い合わせてください。
         </GuideItem>
         <GuideItem label="データ管理">
           この端末での使用容量の確認、全データのJSONファイルへの書き出し(バックアップ)、書き出したJSONファイルからの復元ができます。
@@ -2282,208 +2275,6 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
 }
 
 /* ---------------------------------------------------------
-   売上履歴画面
---------------------------------------------------------- */
-const HISTORY_TABLE_COLS = "170px 110px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
-
-function HistoryScreen({ salesHistory, onSelectSale, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
-  const [mode, setMode] = useState("today"); // today | all | date
-  const [dateValue, setDateValue] = useState(toDateInputValue(new Date().toISOString()));
-
-  const filtered = salesHistory
-    .filter((s) => {
-      if (mode === "today") return isToday(s.endTime);
-      if (mode === "date") return isSameDate(s.endTime, dateValue);
-      return true;
-    })
-    .sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
-
-  const totalAmount = filtered.reduce((sum, s) => sum + s.total, 0);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Header
-        title="売上履歴"
-        right={<HeaderIconButton icon={Settings} onClick={onOpenSettings} title="マスタ設定" />}
-      />
-
-      <HomeTabBar active={activeHomeTab} onSelect={onSelectHomeTab} />
-
-      <div style={{ padding: "12px 20px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper }}>
-        <button
-          onClick={() => setMode("today")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 20,
-            border: `1.5px solid ${mode === "today" ? COLORS.teal : COLORS.line}`,
-            background: mode === "today" ? COLORS.teal : "transparent",
-            color: mode === "today" ? "#FBF9F4" : COLORS.inkSoft,
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          本日のみ
-        </button>
-        <button
-          onClick={() => setMode("all")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 20,
-            border: `1.5px solid ${mode === "all" ? COLORS.teal : COLORS.line}`,
-            background: mode === "all" ? COLORS.teal : "transparent",
-            color: mode === "all" ? "#FBF9F4" : COLORS.inkSoft,
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          すべて
-        </button>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 12px",
-            borderRadius: 20,
-            border: `1.5px solid ${mode === "date" ? COLORS.teal : COLORS.line}`,
-            background: mode === "date" ? COLORS.sageBg : "transparent",
-          }}
-        >
-          <CalendarDays size={14} color={COLORS.inkSoft} />
-          <input
-            type="date"
-            value={dateValue}
-            onChange={(e) => { setDateValue(e.target.value); setMode("date"); }}
-            style={{ border: "none", background: "transparent", fontFamily: MONO, fontSize: 13, color: COLORS.ink }}
-          />
-        </div>
-        <button
-          onClick={() => {
-            const suffix = mode === "today" ? "today" : mode === "date" ? dateValue : "all";
-            downloadCsv(`sales-history_${suffix}_${csvTimestamp()}.csv`, salesHistoryToCsvRows(filtered));
-          }}
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 14px",
-            borderRadius: 20,
-            border: `1.5px solid ${COLORS.line}`,
-            background: "transparent",
-            color: COLORS.inkSoft,
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          <Download size={14} />
-          CSVダウンロード
-        </button>
-      </div>
-
-      <div
-        style={{
-          padding: "10px 20px",
-          display: "flex",
-          gap: 20,
-          fontFamily: MONO,
-          fontSize: 12,
-          color: COLORS.inkSoft,
-          borderBottom: `1px dashed ${COLORS.line}`,
-          background: COLORS.paper,
-        }}
-      >
-        <span>会計 {filtered.length}件</span>
-        <span>合計 {formatYen(totalAmount)}</span>
-      </div>
-
-      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-        {filtered.length === 0 && (
-          <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "40px 0", textAlign: "center" }}>
-            該当する会計データがありません
-          </div>
-        )}
-        {filtered.length > 0 && (
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 1230 }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: HISTORY_TABLE_COLS,
-                  gap: 4,
-                  padding: "8px 10px",
-                  borderBottom: `1px solid ${COLORS.line}`,
-                  fontSize: 11.5,
-                  color: COLORS.inkSoft,
-                  fontWeight: 700,
-                }}
-              >
-                <div>日時</div>
-                <div>座席</div>
-                <div>人数</div>
-                <div>小計</div>
-                <div>サービス料</div>
-                <div>消費税</div>
-                <div>合計</div>
-                <div>現金</div>
-                <div>カード</div>
-                <div>PayPay</div>
-                <div>売掛</div>
-                <div>メモ</div>
-              </div>
-              {filtered.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => onSelectSale(s.id)}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: HISTORY_TABLE_COLS,
-                    gap: 4,
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "8px 10px",
-                    borderBottom: `1px dashed ${COLORS.line}`,
-                    fontSize: 12.5,
-                    fontFamily: MONO,
-                    background: "transparent",
-                    border: "none",
-                    borderBottomStyle: "dashed",
-                    borderBottomWidth: 1,
-                    borderBottomColor: COLORS.line,
-                    cursor: "pointer",
-                    alignItems: "center",
-                  }}
-                >
-                  <div style={{ fontFamily: SANS, color: COLORS.ink }}>{formatDateTimeRange(s.startTime, s.endTime)}</div>
-                  <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {seatDisplayLabel(s.seatId, s.seatName)}
-                  </div>
-                  <div>{s.guests}名</div>
-                  <div>{formatYen(s.subtotal)}</div>
-                  <div>{formatYen(s.serviceCharge)}</div>
-                  <div>{formatYen(s.tax)}</div>
-                  <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
-                  <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
-                  <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
-                  <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
-                  <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
-                  <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {s.memo || ""}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------
    売上履歴 - 明細画面
 --------------------------------------------------------- */
 function HistoryDetailScreen({ sale, onBack }) {
@@ -2571,8 +2362,8 @@ function HistoryDetailScreen({ sale, onBack }) {
 function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [screen, setScreen] = useState("top"); // top | order | checkout | settings | history | historyDetail | salesManagement | payroll
-  const [homeTab, setHomeTab] = useState("seats"); // seats | history | salesManagement | payroll
+  const [screen, setScreen] = useState("top"); // top | order | checkout | settings | historyDetail | salesManagement | payroll
+  const [homeTab, setHomeTab] = useState("seats"); // seats | salesManagement | payroll
   const [activeSeat, setActiveSeat] = useState(null);
   const [guestModalSeat, setGuestModalSeat] = useState(null);
   const [selectedSaleId, setSelectedSaleId] = useState(null);
@@ -2685,8 +2476,8 @@ function App() {
       ...dataRef.current,
       security: {
         ...dataRef.current.security,
-        enabled: { history: false, salesManagement: false, payroll: false },
-        passwords: { history: "", salesManagement: "", payroll: "" },
+        enabled: { salesManagement: false, payroll: false },
+        passwords: { salesManagement: "", payroll: "" },
       },
     });
     setUnlockedTabs(new Set());
@@ -2836,16 +2627,6 @@ function App() {
         />
       )}
 
-      {screen === "history" && (
-        <HistoryScreen
-          salesHistory={data.salesHistory}
-          onSelectSale={(id) => { setSelectedSaleId(id); setScreen("historyDetail"); }}
-          onOpenSettings={() => setScreen("settings")}
-          activeHomeTab={homeTab}
-          onSelectHomeTab={handleSelectHomeTab}
-        />
-      )}
-
       {screen === "salesManagement" && (
         <SalesManagementScreen
           data={data}
@@ -2853,6 +2634,7 @@ function App() {
           onOpenSettings={() => setScreen("settings")}
           activeHomeTab={homeTab}
           onSelectHomeTab={handleSelectHomeTab}
+          onSelectSale={(id) => { setSelectedSaleId(id); setScreen("historyDetail"); }}
         />
       )}
 
@@ -2872,7 +2654,7 @@ function App() {
         if (!sale) {
           return (
             <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <Header title="会計明細" onBack={() => { setSelectedSaleId(null); setScreen("history"); }} />
+              <Header title="会計明細" onBack={() => { setSelectedSaleId(null); setScreen("salesManagement"); }} />
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.inkSoft, fontSize: 13 }}>
                 データが見つかりませんでした
               </div>
@@ -2882,7 +2664,7 @@ function App() {
         return (
           <HistoryDetailScreen
             sale={sale}
-            onBack={() => { setSelectedSaleId(null); setScreen("history"); }}
+            onBack={() => { setSelectedSaleId(null); setScreen("salesManagement"); }}
           />
         );
       })()}

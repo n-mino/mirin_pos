@@ -4,9 +4,9 @@
    app.jsx で定義されたグローバル(COLORS/MONO/DISPLAY/SANS/
    各アイコン/TicketButton/Header/HeaderIconButton/HomeTabBar/
    formatYen/uid/toDateInputValue/isSameDate/formatDateTimeRange/
-   seatDisplayLabel/HISTORY_TABLE_COLS/useMediaQuery/React hooks)を
-   そのまま再利用する。「日次集計」タブの売上履歴・勤怠一覧は、それぞれ
-   app.jsxのHistoryScreen・payroll.jsxのShiftListPanelと同じ列構成
+   seatDisplayLabel/useMediaQuery/React hooks)をそのまま再利用する。
+   「日次集計」タブの売上履歴・勤怠一覧は、それぞれ本ファイルの
+   SalesHistoryPanel・payroll.jsxのShiftListPanelと同じ列構成
    (HISTORY_TABLE_COLS/SHIFT_TABLE_COLS、および formatHours/
    payrollShiftTotal)を再利用して表示内容を完全に一致させている。
    payroll.jsxはこのファイルより後に読み込まれるが、SHIFT_TABLE_COLSや
@@ -962,15 +962,179 @@ function AggregationGraphPanel({ data }) {
 }
 
 /* ---------------------------------------------------------
+   売上履歴パネル(売上管理内のサブタブ)
+--------------------------------------------------------- */
+const HISTORY_TABLE_COLS = "170px 110px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
+
+function SalesHistoryPanel({ salesHistory, onSelectSale }) {
+  const [mode, setMode] = useState("today"); // today | all | date
+  const [dateValue, setDateValue] = useState(toDateInputValue(new Date().toISOString()));
+
+  const filtered = salesHistory
+    .filter((s) => {
+      if (mode === "today") return isToday(s.endTime);
+      if (mode === "date") return isSameDate(s.endTime, dateValue);
+      return true;
+    })
+    .sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
+
+  const totalAmount = filtered.reduce((sum, s) => sum + s.total, 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+        <button onClick={() => setMode("today")} style={salesTabPillStyle(mode === "today")}>本日のみ</button>
+        <button onClick={() => setMode("all")} style={salesTabPillStyle(mode === "all")}>すべて</button>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 12px",
+            borderRadius: 20,
+            border: `1.5px solid ${mode === "date" ? COLORS.teal : COLORS.line}`,
+            background: mode === "date" ? COLORS.sageBg : "transparent",
+          }}
+        >
+          <CalendarDays size={14} color={COLORS.inkSoft} />
+          <input
+            type="date"
+            value={dateValue}
+            onChange={(e) => { setDateValue(e.target.value); setMode("date"); }}
+            style={{ border: "none", background: "transparent", fontFamily: MONO, fontSize: 13, color: COLORS.ink }}
+          />
+        </div>
+        <button
+          onClick={() => {
+            const suffix = mode === "today" ? "today" : mode === "date" ? dateValue : "all";
+            downloadCsv(`sales-history_${suffix}_${csvTimestamp()}.csv`, salesHistoryToCsvRows(filtered));
+          }}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "8px 14px",
+            borderRadius: 20,
+            border: `1.5px solid ${COLORS.line}`,
+            background: "transparent",
+            color: COLORS.inkSoft,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          <Download size={14} />
+          CSVダウンロード
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 20,
+          fontFamily: MONO,
+          fontSize: 12,
+          color: COLORS.inkSoft,
+          marginBottom: 12,
+        }}
+      >
+        <span>会計 {filtered.length}件</span>
+        <span>合計 {formatYen(totalAmount)}</span>
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "40px 0", textAlign: "center" }}>
+          該当する会計データがありません
+        </div>
+      )}
+      {filtered.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: 1230 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: HISTORY_TABLE_COLS,
+                gap: 4,
+                padding: "8px 10px",
+                borderBottom: `1px solid ${COLORS.line}`,
+                fontSize: 11.5,
+                color: COLORS.inkSoft,
+                fontWeight: 700,
+              }}
+            >
+              <div>日時</div>
+              <div>座席</div>
+              <div>人数</div>
+              <div>小計</div>
+              <div>サービス料</div>
+              <div>消費税</div>
+              <div>合計</div>
+              <div>現金</div>
+              <div>カード</div>
+              <div>PayPay</div>
+              <div>売掛</div>
+              <div>メモ</div>
+            </div>
+            {filtered.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => onSelectSale(s.id)}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: HISTORY_TABLE_COLS,
+                  gap: 4,
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "8px 10px",
+                  borderBottom: `1px dashed ${COLORS.line}`,
+                  fontSize: 12.5,
+                  fontFamily: MONO,
+                  background: "transparent",
+                  border: "none",
+                  borderBottomStyle: "dashed",
+                  borderBottomWidth: 1,
+                  borderBottomColor: COLORS.line,
+                  cursor: "pointer",
+                  alignItems: "center",
+                }}
+              >
+                <div style={{ fontFamily: SANS, color: COLORS.ink }}>{formatDateTimeRange(s.startTime, s.endTime)}</div>
+                <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {seatDisplayLabel(s.seatId, s.seatName)}
+                </div>
+                <div>{s.guests}名</div>
+                <div>{formatYen(s.subtotal)}</div>
+                <div>{formatYen(s.serviceCharge)}</div>
+                <div>{formatYen(s.tax)}</div>
+                <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
+                <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
+                <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
+                <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
+                <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
+                <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {s.memo || ""}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
    売上管理画面(トップレベル)
 --------------------------------------------------------- */
 const SALES_MANAGEMENT_TABS = [
+  { id: "history", label: "売上履歴" },
   { id: "entry", label: "入出金入力" },
   { id: "daily", label: "日次集計" },
   { id: "chart", label: "集計グラフ" },
 ];
 
-function SalesManagementScreen({ data, onUpdateCashFlow, onOpenSettings, activeHomeTab, onSelectHomeTab }) {
+function SalesManagementScreen({ data, onUpdateCashFlow, onOpenSettings, activeHomeTab, onSelectHomeTab, onSelectSale }) {
   const [tab, setTab] = useState(SALES_MANAGEMENT_TABS[0].id);
 
   return (
@@ -991,6 +1155,7 @@ function SalesManagementScreen({ data, onUpdateCashFlow, onOpenSettings, activeH
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        {tab === "history" && <SalesHistoryPanel salesHistory={data.salesHistory} onSelectSale={onSelectSale} />}
         {tab === "entry" && <CashFlowEntryPanel cashFlow={data.cashFlow} onUpdateCashFlow={onUpdateCashFlow} />}
         {tab === "daily" && <DailySummaryPanel data={data} />}
         {tab === "chart" && <AggregationGraphPanel data={data} />}
