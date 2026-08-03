@@ -243,7 +243,7 @@ function DailySalesTable({ sales }) {
   }
   return (
     <div style={{ overflowX: "auto" }}>
-      <div style={{ minWidth: 1230 }}>
+      <div style={{ minWidth: 1290 }}>
         <div
           style={{
             display: "grid",
@@ -259,6 +259,7 @@ function DailySalesTable({ sales }) {
           <div>日時</div>
           <div>座席</div>
           <div>人数</div>
+          <div>同伴</div>
           <div>小計</div>
           <div>サービス料</div>
           <div>消費税</div>
@@ -288,6 +289,7 @@ function DailySalesTable({ sales }) {
               {seatDisplayLabel(s.seatId, s.seatName)}
             </div>
             <div>{s.guests}名</div>
+            <div>{s.companion ? "○" : ""}</div>
             <div>{formatYen(s.subtotal)}</div>
             <div>{formatYen(s.serviceCharge)}</div>
             <div>{formatYen(s.tax)}</div>
@@ -436,12 +438,13 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   };
 
   const salesRowsHtml = sales.length === 0
-    ? `<tr><td colspan="12" style="text-align:center;color:#5B6459">該当する会計データがありません</td></tr>`
+    ? `<tr><td colspan="13" style="text-align:center;color:#5B6459">該当する会計データがありません</td></tr>`
     : sales.map((s) => `
       <tr>
         <td>${escapeHtml(formatDateTimeRange(s.startTime, s.endTime))}</td>
         <td>${escapeHtml(seatDisplayLabel(s.seatId, s.seatName))}</td>
         <td class="num">${s.guests}名</td>
+        <td class="num">${s.companion ? "○" : ""}</td>
         <td class="num">${escapeHtml(formatYen(s.subtotal))}</td>
         <td class="num">${escapeHtml(formatYen(s.serviceCharge))}</td>
         <td class="num">${escapeHtml(formatYen(s.tax))}</td>
@@ -500,7 +503,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
 
   <h2>売上履歴</h2>
   <table>
-    <thead><tr><th>日時</th><th>座席</th><th>人数</th><th>小計</th><th>サービス料</th><th>消費税</th><th>合計</th><th>現金</th><th>カード</th><th>PayPay</th><th>売掛</th><th>メモ</th></tr></thead>
+    <thead><tr><th>日時</th><th>座席</th><th>人数</th><th>同伴</th><th>小計</th><th>サービス料</th><th>消費税</th><th>合計</th><th>現金</th><th>カード</th><th>PayPay</th><th>売掛</th><th>メモ</th></tr></thead>
     <tbody>${salesRowsHtml}</tbody>
   </table>
 
@@ -964,7 +967,7 @@ function AggregationGraphPanel({ data }) {
 /* ---------------------------------------------------------
    売上履歴パネル(売上管理内のサブタブ)
 --------------------------------------------------------- */
-const HISTORY_TABLE_COLS = "170px 110px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
+const HISTORY_TABLE_COLS = "170px 110px 60px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
 
 function SalesHistoryPanel({ salesHistory, onSelectSale }) {
   const [mode, setMode] = useState("today"); // today | all | date
@@ -1050,7 +1053,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
       )}
       {filtered.length > 0 && (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 1230 }}>
+          <div style={{ minWidth: 1290 }}>
             <div
               style={{
                 display: "grid",
@@ -1066,6 +1069,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
               <div>日時</div>
               <div>座席</div>
               <div>人数</div>
+              <div>同伴</div>
               <div>小計</div>
               <div>サービス料</div>
               <div>消費税</div>
@@ -1104,6 +1108,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
                   {seatDisplayLabel(s.seatId, s.seatName)}
                 </div>
                 <div>{s.guests}名</div>
+                <div>{s.companion ? "○" : ""}</div>
                 <div>{formatYen(s.subtotal)}</div>
                 <div>{formatYen(s.serviceCharge)}</div>
                 <div>{formatYen(s.tax)}</div>

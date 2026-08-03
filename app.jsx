@@ -183,7 +183,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/01 15:20";
+const APP_LAST_UPDATED = "2026/08/03 12:00";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -413,10 +413,10 @@ function csvTimestamp() {
 
 // 売上履歴(売上管理内の売上履歴タブ・マスタ設定の全件書き出し双方で使う行データ)
 function salesHistoryToCsvRows(salesHistory) {
-  const rows = [["会計ID", "日時", "座席", "人数", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
+  const rows = [["会計ID", "日時", "座席", "人数", "同伴", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
   (salesHistory || []).forEach((s) => {
     rows.push([
-      s.id, s.endTime, seatDisplayLabel(s.seatId, s.seatName), s.guests, s.subtotal, s.serviceCharge, s.tax, s.total,
+      s.id, s.endTime, seatDisplayLabel(s.seatId, s.seatName), s.guests, s.companion ? "○" : "", s.subtotal, s.serviceCharge, s.tax, s.total,
       s.payments?.cash || 0, s.payments?.card || 0, s.payments?.paypay || 0, s.payments?.onAccount || 0,
       s.memo || "",
     ]);
@@ -738,6 +738,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
 --------------------------------------------------------- */
 function GuestCountModal({ seatNum, onConfirm, onCancel }) {
   const [count, setCount] = useState(2);
+  const [companion, setCompanion] = useState(false);
   const quick = [1, 2, 3, 4, 5, 6, 8];
 
   return (
@@ -794,7 +795,7 @@ function GuestCountModal({ seatNum, onConfirm, onCancel }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 18 }}>
           <button
             onClick={() => setCount((c) => Math.max(1, c - 1))}
             style={{ width: 38, height: 38, borderRadius: "50%", border: `1.5px solid ${COLORS.line}`, background: COLORS.paper, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -812,9 +813,14 @@ function GuestCountModal({ seatNum, onConfirm, onCancel }) {
           </button>
         </div>
 
+        <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 22, cursor: "pointer" }}>
+          <input type="checkbox" checked={companion} onChange={(e) => setCompanion(e.target.checked)} style={{ width: 16, height: 16 }} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>同伴</span>
+        </label>
+
         <div style={{ display: "flex", gap: 10 }}>
           <TicketButton variant="ghost" onClick={onCancel} style={{ flex: 1 }}>キャンセル</TicketButton>
-          <TicketButton variant="primary" onClick={() => onConfirm(count)} style={{ flex: 1 }}>開始する</TicketButton>
+          <TicketButton variant="primary" onClick={() => onConfirm(count, companion)} style={{ flex: 1 }}>開始する</TicketButton>
         </div>
       </div>
     </div>
@@ -1109,7 +1115,7 @@ function OrderScreen({ seatNum, seatName, seat, products, now, onUpdateOrders, o
         {/* 注文リスト */}
         <div style={{ flex: isNarrow ? "none" : 1, display: "flex", flexDirection: "column", minWidth: isNarrow ? 0 : 260 }}>
           <div style={{ padding: "12px 16px", fontSize: 12, fontFamily: MONO, color: COLORS.inkSoft, borderBottom: `1px solid ${COLORS.line}` }}>
-            ORDER LIST
+            ORDER LIST{seat.companion ? " ★同伴★" : ""}
           </div>
           <div style={{ flex: isNarrow ? "none" : 1, overflowY: isNarrow ? "visible" : "auto", padding: "8px 16px" }}>
             {seat.orders.length === 0 && (
@@ -2504,9 +2510,9 @@ function App() {
     }
   };
 
-  const handleConfirmGuests = (count) => {
+  const handleConfirmGuests = (count, companion) => {
     const n = guestModalSeat;
-    const newSeats = { ...dataRef.current.seats, [n]: { guests: count, startTime: new Date().toISOString(), orders: [] } };
+    const newSeats = { ...dataRef.current.seats, [n]: { guests: count, companion: !!companion, startTime: new Date().toISOString(), orders: [] } };
     persist({ ...dataRef.current, seats: newSeats });
     setGuestModalSeat(null);
     setActiveSeat(n);
@@ -2537,6 +2543,7 @@ function App() {
       seatId: n,
       seatName: dataRef.current.seatNames?.[n] || "",
       guests: seat.guests,
+      companion: !!seat.companion,
       startTime: seat.startTime,
       endTime: new Date().toISOString(),
       orders: seat.orders,
