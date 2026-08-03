@@ -183,7 +183,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/03 20:06";
+const APP_LAST_UPDATED = "2026/08/03 20:22";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -1925,7 +1925,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 20, maxWidth: 560, margin: "0 auto", width: "100%" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: 20, maxWidth: tab === "seats" ? "none" : 560, margin: "0 auto", width: "100%" }}>
         {tab === "products" && (
           <>
             <TicketButton variant="primary" onClick={() => setEditing({})} icon={Plus} style={{ marginBottom: 16 }}>
@@ -2032,6 +2032,11 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
+              {!isNarrow && (
+                <div style={{ visibility: "hidden", marginBottom: 16 }} aria-hidden="true">
+                  <TicketButton variant="primary" icon={Plus} style={{ pointerEvents: "none" }}>座席を追加</TicketButton>
+                </div>
+              )}
               <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20 }}>
                 <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 8 }}>座席カードの色分け</div>
                 <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 18, lineHeight: 1.6 }}>
