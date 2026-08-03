@@ -183,7 +183,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/03 18:56";
+const APP_LAST_UPDATED = "2026/08/03 20:06";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -205,6 +205,7 @@ function defaultData() {
     seatCount: 5,
     seats: {},
     seatNames: {},
+    seatToneThresholds: { warnMinutes: 30, dangerMinutes: 60 }, // 座席カード色分けの分数閾値(緑→黄 / 黄→赤)
     salesHistory: [],
     serviceChargeRate: 0, // %
     taxRate: 10, // %
@@ -323,9 +324,11 @@ function getEffectivePrice(product, date) {
   return product.price;
 }
 
-function seatTone(minutes) {
-  if (minutes < 30) return { fg: COLORS.sage, bg: COLORS.sageBg, label: "" };
-  if (minutes < 60) return { fg: COLORS.amber, bg: COLORS.amberBg, label: "" };
+function seatTone(minutes, thresholds) {
+  const warn = thresholds?.warnMinutes ?? 30;
+  const danger = thresholds?.dangerMinutes ?? 60;
+  if (minutes < warn) return { fg: COLORS.sage, bg: COLORS.sageBg, label: "" };
+  if (minutes < danger) return { fg: COLORS.amber, bg: COLORS.amberBg, label: "" };
   return { fg: COLORS.brick, bg: COLORS.brickBg, label: "" };
 }
 
@@ -657,7 +660,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
             const seat = data.seats[n];
             const occupied = !!seat;
             const mins = occupied ? elapsedMinutes(seat.startTime, now) : 0;
-            const tone = occupied ? seatTone(mins) : { fg: COLORS.inkSoft, bg: COLORS.paper };
+            const tone = occupied ? seatTone(mins, data.seatToneThresholds) : { fg: COLORS.inkSoft, bg: COLORS.paper };
             const total = occupied ? seatOrderTotal(seat) : 0;
             const seatName = data.seatNames?.[n];
 
@@ -1763,11 +1766,14 @@ function UserGuidePanel() {
 /* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
-function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData, onDeleteAllData, onUpdateSecurity, onResetSecurity, showToast }) {
+function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onUpdateSeatToneThresholds, onImportData, onDeleteAllData, onUpdateSecurity, onResetSecurity, showToast }) {
+  const isNarrow = useMediaQuery("(max-width: 720px)");
   const [tab, setTab] = useState("products");
   const [editing, setEditing] = useState(null); // product being edited, or {} for new
   const [serviceInput, setServiceInput] = useState(String(data.serviceChargeRate ?? 0));
   const [taxInput, setTaxInput] = useState(String(data.taxRate ?? 0));
+  const [warnInput, setWarnInput] = useState(String(data.seatToneThresholds?.warnMinutes ?? 30));
+  const [dangerInput, setDangerInput] = useState(String(data.seatToneThresholds?.dangerMinutes ?? 60));
   const [importError, setImportError] = useState("");
   const [importOk, setImportOk] = useState("");
   const [storageEstimate, setStorageEstimate] = useState(null);
@@ -1879,6 +1885,16 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
     showToast("保存しました");
   };
 
+  const applySeatToneThresholds = () => {
+    const warn = Math.max(1, Math.round(Number(warnInput) || 1));
+    let danger = Math.max(1, Math.round(Number(dangerInput) || 1));
+    if (danger <= warn) danger = warn + 1;
+    setWarnInput(String(warn));
+    setDangerInput(String(danger));
+    onUpdateSeatToneThresholds(warn, danger);
+    showToast("保存しました");
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header title="マスタ設定" onBack={onBack} />
@@ -1953,66 +1969,112 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
         )}
 
         {tab === "seats" && (
-          <>
-            <TicketButton variant="primary" onClick={addSeat} icon={Plus} disabled={data.seatCount >= 200} style={{ marginBottom: 16 }}>
-              座席を追加
-            </TicketButton>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {Array.from({ length: data.seatCount }, (_, i) => i + 1).map((n) => {
-                const occupied = !!data.seats[n];
-                const isLast = n === data.seatCount;
-                return (
-                  <div
-                    key={n}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                      background: COLORS.paper,
-                      border: `1.5px solid ${COLORS.line}`,
-                      borderRadius: 8,
-                      padding: "10px 14px",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>座席 {n}</div>
-                        {occupied && (
-                          <div style={{ fontSize: 12, color: COLORS.brick, fontFamily: MONO }}>使用中</div>
+          <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 20 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <TicketButton variant="primary" onClick={addSeat} icon={Plus} disabled={data.seatCount >= 200} style={{ marginBottom: 16 }}>
+                座席を追加
+              </TicketButton>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {Array.from({ length: data.seatCount }, (_, i) => i + 1).map((n) => {
+                  const occupied = !!data.seats[n];
+                  const isLast = n === data.seatCount;
+                  return (
+                    <div
+                      key={n}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        background: COLORS.paper,
+                        border: `1.5px solid ${COLORS.line}`,
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>座席 {n}</div>
+                          {occupied && (
+                            <div style={{ fontSize: 12, color: COLORS.brick, fontFamily: MONO }}>使用中</div>
+                          )}
+                        </div>
+                        {isLast && (
+                          <button
+                            onClick={removeLastSeat}
+                            disabled={occupied || data.seatCount <= 1}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 6,
+                              border: `1px solid ${COLORS.brick}`,
+                              background: "transparent",
+                              cursor: occupied || data.seatCount <= 1 ? "not-allowed" : "pointer",
+                              opacity: occupied || data.seatCount <= 1 ? 0.4 : 1,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: COLORS.brick,
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         )}
                       </div>
-                      {isLast && (
-                        <button
-                          onClick={removeLastSeat}
-                          disabled={occupied || data.seatCount <= 1}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 6,
-                            border: `1px solid ${COLORS.brick}`,
-                            background: "transparent",
-                            cursor: occupied || data.seatCount <= 1 ? "not-allowed" : "pointer",
-                            opacity: occupied || data.seatCount <= 1 ? 0.4 : 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: COLORS.brick,
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
+                      <SeatNameInput
+                        seatNum={n}
+                        initialValue={data.seatNames?.[n] || ""}
+                        onSave={(name) => onUpdateSeatName(n, name)}
+                      />
                     </div>
-                    <SeatNameInput
-                      seatNum={n}
-                      initialValue={data.seatNames?.[n] || ""}
-                      onSave={(name) => onUpdateSeatName(n, name)}
-                    />
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20 }}>
+                <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 8 }}>座席カードの色分け</div>
+                <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 18, lineHeight: 1.6 }}>
+                  座席一覧で使用中の座席カードは、経過時間に応じて色が変わります。切り替わりまでの時間を分単位で設定してください。
+                </div>
+
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: COLORS.ink, fontWeight: 600, marginBottom: 8 }}>
+                    <Clock size={14} /> 黄色に変わるまでの時間
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <input
+                      type="number"
+                      value={warnInput}
+                      onChange={(e) => setWarnInput(e.target.value)}
+                      style={{ flex: 1, padding: "10px 12px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, fontFamily: MONO, fontSize: 16 }}
+                    />
+                    <span style={{ fontFamily: MONO, color: COLORS.inkSoft }}>分</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 22 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: COLORS.ink, fontWeight: 600, marginBottom: 8 }}>
+                    <Clock size={14} /> 赤色に変わるまでの時間
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <input
+                      type="number"
+                      value={dangerInput}
+                      onChange={(e) => setDangerInput(e.target.value)}
+                      style={{ flex: 1, padding: "10px 12px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, fontFamily: MONO, fontSize: 16 }}
+                    />
+                    <span style={{ fontFamily: MONO, color: COLORS.inkSoft }}>分</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 6 }}>
+                    ※赤色の時間は黄色の時間より後に設定してください(短い場合は自動的に調整されます)
+                  </div>
+                </div>
+
+                <TicketButton variant="primary" onClick={applySeatToneThresholds} style={{ width: "100%" }}>保存</TicketButton>
+              </div>
+            </div>
+          </div>
         )}
 
         {tab === "rates" && (
@@ -2684,6 +2746,9 @@ function App() {
           onUpdateSeatCount={(n) => persist({ ...dataRef.current, seatCount: n })}
           onUpdateSeatName={(n, name) => persist({ ...dataRef.current, seatNames: { ...dataRef.current.seatNames, [n]: name } })}
           onUpdateRates={(service, tax) => persist({ ...dataRef.current, serviceChargeRate: service, taxRate: tax })}
+          onUpdateSeatToneThresholds={(warn, danger) =>
+            persist({ ...dataRef.current, seatToneThresholds: { warnMinutes: warn, dangerMinutes: danger } })
+          }
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
           onDeleteAllData={() => persist(defaultData())}
           onUpdateSecurity={onUpdateSecurity}
