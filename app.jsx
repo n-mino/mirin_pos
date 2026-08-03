@@ -183,7 +183,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/03 18:12";
+const APP_LAST_UPDATED = "2026/08/03 18:29";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -1776,6 +1776,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const [pendingExport, setPendingExport] = useState(false);
   const [pendingDeleteAllPassword, setPendingDeleteAllPassword] = useState(false);
   const [pendingDeleteAllConfirm, setPendingDeleteAllConfirm] = useState(false);
+  const [pendingRestorePassword, setPendingRestorePassword] = useState(false);
+  const [restoreFileName, setRestoreFileName] = useState("");
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -1813,6 +1815,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const handleImportFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setRestoreFileName(file.name);
     setImportError("");
     setImportOk("");
     const reader = new FileReader();
@@ -2134,8 +2137,14 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
                 type="file"
                 accept="application/json"
                 onChange={handleImportFile}
-                style={{ fontSize: 13, marginBottom: 8 }}
+                style={{ display: "none" }}
               />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <TicketButton variant="ghost" onClick={() => setPendingRestorePassword(true)} style={{ padding: "8px 16px" }}>
+                  ファイルを選択
+                </TicketButton>
+                <span style={{ fontSize: 12.5, color: COLORS.inkSoft }}>{restoreFileName || "選択されていません"}</span>
+              </div>
               {importError && (
                 <div style={{ fontSize: 12, color: COLORS.brick, marginTop: 8 }}>{importError}</div>
               )}
@@ -2185,6 +2194,16 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
           stored={encodePassword(SETTINGS_ADMIN_PASSWORD)}
           onCancel={() => setPendingExport(false)}
           onSuccess={() => { setPendingExport(false); exportData(); }}
+        />
+      )}
+
+      {pendingRestorePassword && (
+        <PasswordPromptModal
+          label="バックアップの復元"
+          message="「バックアップの復元」を行うにはパスワードを入力してください。"
+          stored={encodePassword(SETTINGS_ADMIN_PASSWORD)}
+          onCancel={() => setPendingRestorePassword(false)}
+          onSuccess={() => { setPendingRestorePassword(false); fileInputRef.current?.click(); }}
         />
       )}
 
