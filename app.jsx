@@ -183,7 +183,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/03 17:26";
+const APP_LAST_UPDATED = "2026/08/03 18:12";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -706,7 +706,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                   </span>
                   {occupied && (
                     <span style={{ fontSize: 11, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
-                      ● 使用中
+                      ● 使用中{seat.companion ? "(同伴)" : ""}
                     </span>
                   )}
                 </div>
@@ -1763,7 +1763,7 @@ function UserGuidePanel() {
 /* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
-function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData, onUpdateSecurity, onResetSecurity, showToast }) {
+function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onImportData, onDeleteAllData, onUpdateSecurity, onResetSecurity, showToast }) {
   const [tab, setTab] = useState("products");
   const [editing, setEditing] = useState(null); // product being edited, or {} for new
   const [serviceInput, setServiceInput] = useState(String(data.serviceChargeRate ?? 0));
@@ -1774,6 +1774,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const [passwordTabUnlocked, setPasswordTabUnlocked] = useState(false);
   const [pendingPasswordTab, setPendingPasswordTab] = useState(false);
   const [pendingExport, setPendingExport] = useState(false);
+  const [pendingDeleteAllPassword, setPendingDeleteAllPassword] = useState(false);
+  const [pendingDeleteAllConfirm, setPendingDeleteAllConfirm] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -2141,6 +2143,18 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
                 <div style={{ fontSize: 12, color: COLORS.sage, marginTop: 8 }}>{importOk}</div>
               )}
             </div>
+
+            <div style={{ height: 1, background: COLORS.line, margin: "20px 0" }} />
+
+            <div>
+              <div style={{ fontSize: 13, color: COLORS.brick, fontWeight: 700, marginBottom: 8 }}>全データ削除</div>
+              <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 10, lineHeight: 1.6 }}>
+                この端末に保存されている商品・座席・売上履歴・設定などすべてのデータを削除し、初期状態に戻します。この操作は取り消せません。事前にバックアップの書き出しをおすすめします。
+              </div>
+              <TicketButton variant="danger" onClick={() => setPendingDeleteAllPassword(true)} style={{ width: "100%", background: COLORS.brick, color: "#FBF9F4" }}>
+                全データ削除
+              </TicketButton>
+            </div>
           </div>
         )}
 
@@ -2171,6 +2185,30 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
           stored={encodePassword(SETTINGS_ADMIN_PASSWORD)}
           onCancel={() => setPendingExport(false)}
           onSuccess={() => { setPendingExport(false); exportData(); }}
+        />
+      )}
+
+      {pendingDeleteAllPassword && (
+        <PasswordPromptModal
+          label="全データ削除"
+          message="「全データ削除」を行うにはパスワードを入力してください。"
+          stored={encodePassword(SETTINGS_ADMIN_PASSWORD)}
+          onCancel={() => setPendingDeleteAllPassword(false)}
+          onSuccess={() => { setPendingDeleteAllPassword(false); setPendingDeleteAllConfirm(true); }}
+        />
+      )}
+
+      {pendingDeleteAllConfirm && (
+        <ConfirmModal
+          title="全データ削除"
+          message="すべてのデータを削除します。本当に削除しますか？"
+          confirmLabel="削除する"
+          onCancel={() => setPendingDeleteAllConfirm(false)}
+          onConfirm={() => {
+            setPendingDeleteAllConfirm(false);
+            onDeleteAllData();
+            showToast("全データを削除しました");
+          }}
         />
       )}
     </div>
@@ -2628,6 +2666,7 @@ function App() {
           onUpdateSeatName={(n, name) => persist({ ...dataRef.current, seatNames: { ...dataRef.current.seatNames, [n]: name } })}
           onUpdateRates={(service, tax) => persist({ ...dataRef.current, serviceChargeRate: service, taxRate: tax })}
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
+          onDeleteAllData={() => persist(defaultData())}
           onUpdateSecurity={onUpdateSecurity}
           onResetSecurity={onResetSecurity}
           showToast={showToast}
