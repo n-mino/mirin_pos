@@ -380,6 +380,8 @@ const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 80px 80px 80px 90px 140px 7
 function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(employees[0]?.id || "");
+  const [dateMode, setDateMode] = useState("today"); // today | all | date
+  const [dateValue, setDateValue] = useState(toDateInputValue(new Date().toISOString()));
   const [deletingShiftId, setDeletingShiftId] = useState(null);
 
   useEffect(() => {
@@ -392,6 +394,11 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   if (viewMode === "individual") {
     list = list.filter((s) => s.employeeId === selectedEmployeeId);
   }
+  list = list.filter((s) => {
+    if (dateMode === "today") return isToday(s.date);
+    if (dateMode === "date") return isSameDate(s.date, dateValue);
+    return true;
+  });
   list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   const exportShiftsCsv = () => {
@@ -405,8 +412,9 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
         shift.note || "",
       ]);
     });
-    const suffix = viewMode === "individual" ? (employees.find((e) => e.id === selectedEmployeeId)?.name || "individual") : "all";
-    downloadCsv(`shift-list_${suffix}_${csvTimestamp()}.csv`, rows);
+    const empSuffix = viewMode === "individual" ? (employees.find((e) => e.id === selectedEmployeeId)?.name || "individual") : "all";
+    const dateSuffix = dateMode === "today" ? "today" : dateMode === "date" ? dateValue : "all";
+    downloadCsv(`shift-list_${empSuffix}_${dateSuffix}_${csvTimestamp()}.csv`, rows);
   };
 
   return (
@@ -415,6 +423,29 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={() => setViewMode("individual")} style={payrollPillStyle(viewMode === "individual")}>個別</button>
           <button onClick={() => setViewMode("all")} style={payrollPillStyle(viewMode === "all")}>全員一括</button>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setDateMode("today")} style={payrollPillStyle(dateMode === "today")}>本日のみ</button>
+          <button onClick={() => setDateMode("all")} style={payrollPillStyle(dateMode === "all")}>すべて</button>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 12px",
+            borderRadius: 20,
+            border: `1.5px solid ${dateMode === "date" ? COLORS.teal : COLORS.line}`,
+            background: dateMode === "date" ? COLORS.sageBg : "transparent",
+          }}
+        >
+          <CalendarDays size={14} color={COLORS.inkSoft} />
+          <input
+            type="date"
+            value={dateValue}
+            onChange={(e) => { setDateValue(e.target.value); setDateMode("date"); }}
+            style={{ border: "none", background: "transparent", fontFamily: MONO, fontSize: 13, color: COLORS.ink }}
+          />
         </div>
         {viewMode === "individual" && employees.length > 0 && (
           <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} style={payrollSelectStyle}>
@@ -824,7 +855,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
         ))}
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: 20, maxWidth: tab === "list" ? "none" : 640, margin: "0 auto", width: "100%" }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: 20, maxWidth: (tab === "list" || tab === "agg") ? "none" : 640, margin: "0 auto", width: "100%" }}>
         {tab === "employees" && (
           <EmployeeListPanel
             employees={employees}
