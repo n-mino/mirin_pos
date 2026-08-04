@@ -31,6 +31,18 @@ function payrollShiftMinutes(startTime, endTime) {
   return diff;
 }
 
+// 開始時刻からの分オフセットで[start, end)の範囲を返す(日をまたぐ勤務はendがstartを超える形で正規化される)
+function payrollShiftRange(startTime, endTime) {
+  const [sh, sm] = (startTime || "0:0").split(":").map(Number);
+  const start = (sh || 0) * 60 + (sm || 0);
+  const minutes = payrollShiftMinutes(startTime, endTime) || 0;
+  return { start, end: start + minutes };
+}
+
+function payrollShiftRangesOverlap(a, b) {
+  return a.start < b.end && b.start < a.end;
+}
+
 function payrollShiftTotal(shift, employees) {
   const emp = employees.find((e) => e.id === shift.employeeId);
   const wage = emp ? emp.hourlyWage : 0;
@@ -233,7 +245,7 @@ function EmployeeEditModal({ employee, onCancel, onSave }) {
 /* ---------------------------------------------------------
    勤怠入力
 --------------------------------------------------------- */
-function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
+function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit }) {
   const blank = () => ({
     employeeId: employees[0]?.id || "",
     date: toDateInputValue(new Date().toISOString()),
@@ -274,6 +286,16 @@ function ShiftEntryPanel({ employees, editingShift, onSave, onCancelEdit }) {
     const minutes = payrollShiftMinutes(form.startTime, form.endTime);
     if (minutes === null) {
       setError("開始時刻と終了時刻が同じです。正しい時刻を入力してください。");
+      return;
+    }
+    const newRange = payrollShiftRange(form.startTime, form.endTime);
+    const hasOverlap = shifts.some((s) => {
+      if (s.id === editingShift?.id) return false;
+      if (s.employeeId !== form.employeeId || s.date !== form.date) return false;
+      return payrollShiftRangesOverlap(newRange, payrollShiftRange(s.startTime, s.endTime));
+    });
+    if (hasOverlap) {
+      setError("同じ日に時間帯が重複する勤怠データがすでに存在します。");
       return;
     }
     setError("");
@@ -867,6 +889,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
         {tab === "entry" && (
           <ShiftEntryPanel
             employees={employees}
+            shifts={shifts}
             editingShift={editingShift}
             onSave={saveShift}
             onCancelEdit={() => { setEditingShiftId(null); setTab("list"); }}
