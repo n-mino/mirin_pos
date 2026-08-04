@@ -395,6 +395,9 @@ function escapeHtml(value) {
 // スクロール領域からはみ出た部分が切れてしまうため、印刷専用の単純なHTMLを
 // 新しいウィンドウに組み立てて印刷する方式にしている。
 function printDailySummary({ targetDate, summaryRows, remaining, expenses, income, sales, shifts, employees }) {
+  const salesTotal = sales.reduce((sum, s) => sum + s.total, 0);
+  const shiftsTotal = shifts.reduce((sum, s) => sum + payrollShiftTotal(s, employees).total, 0);
+
   const style = `
     body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif; color: #20291F; padding: 24px; }
     h1 { font-size: 18px; margin: 0 0 4px; }
@@ -502,12 +505,14 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   </div>
 
   <h2>売上履歴</h2>
+  <div class="sub">会計 ${sales.length}件　合計 ${escapeHtml(formatYen(salesTotal))}</div>
   <table>
     <thead><tr><th>日時</th><th>座席</th><th>人数</th><th>同伴</th><th>小計</th><th>サービス料</th><th>消費税</th><th>合計</th><th>現金</th><th>カード</th><th>PayPay</th><th>売掛</th><th>メモ</th></tr></thead>
     <tbody>${salesRowsHtml}</tbody>
   </table>
 
   <h2>勤怠一覧</h2>
+  <div class="sub">勤怠 ${shifts.length}件　合計 ${escapeHtml(formatYen(shiftsTotal))}</div>
   <table>
     <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>日給</th><th>オプション1</th><th>オプション2</th><th>合計</th><th>メモ</th></tr></thead>
     <tbody>${shiftRowsHtml}</tbody>
@@ -544,6 +549,7 @@ function DailySummaryPanel({ data }) {
   const paypay = sales.reduce((sum, s) => sum + (s.payments?.paypay || 0), 0);
   const onAccount = sales.reduce((sum, s) => sum + (s.payments?.onAccount || 0), 0);
   const totalSales = cash + card + paypay + onAccount;
+  const salesTotal = sales.reduce((sum, s) => sum + s.total, 0);
   const laborCost = shifts.reduce((sum, s) => sum + payrollShiftTotal(s, employees).total, 0);
   const expensesTotal = cashFlowTotal(record.expenses);
   const incomeTotal = cashFlowTotal(record.income);
@@ -647,11 +653,19 @@ function DailySummaryPanel({ data }) {
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>売上履歴</div>
+        <div style={{ display: "flex", gap: 20, fontFamily: MONO, fontSize: 12, color: COLORS.inkSoft, marginBottom: 12 }}>
+          <span>会計 {sales.length}件</span>
+          <span>合計 {formatYen(salesTotal)}</span>
+        </div>
         <DailySalesTable sales={sales} />
       </div>
 
       <div>
         <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>勤怠一覧</div>
+        <div style={{ display: "flex", gap: 20, fontFamily: MONO, fontSize: 12, color: COLORS.inkSoft, marginBottom: 12 }}>
+          <span>勤怠 {shifts.length}件</span>
+          <span>合計 {formatYen(laborCost)}</span>
+        </div>
         <DailyShiftTable shifts={shifts} employees={employees} />
       </div>
     </div>
