@@ -1,0 +1,355 @@
+<title>配色パレット — 現状 / 青系提案</title>
+<style>
+  :root {
+    --bg: #EFEBE2;
+    --paper: #FBF9F4;
+    --ink: #20291F;
+    --ink-soft: #5B6459;
+    --line: #DCD4C4;
+    --mono: 'SFMono-Regular', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    --card-bg: #FBF9F4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    padding: 40px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+  }
+
+  .page { width: 100%; max-width: 980px; display: flex; flex-direction: column; gap: 40px; }
+
+  header h1 {
+    font-size: 22px;
+    font-weight: 800;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  header p {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+    margin: 0;
+    max-width: 66ch;
+  }
+
+  section h2 {
+    font-size: 14px;
+    font-weight: 800;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  section h2 .en {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--ink-soft);
+    letter-spacing: 0.03em;
+  }
+  section > p.lead {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin: 0 0 16px;
+    line-height: 1.6;
+  }
+
+  .group-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    letter-spacing: 0.06em;
+    margin: 18px 0 8px;
+    text-transform: uppercase;
+  }
+  .group-label:first-child { margin-top: 0; }
+
+  .swatchgrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 10px;
+  }
+
+  .swatch {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--card-bg);
+  }
+  .swatch .chip {
+    height: 56px;
+    position: relative;
+  }
+  .swatch .chip .pairtag {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.85);
+    color: #333;
+  }
+  .swatch .meta { padding: 8px 10px 10px; }
+  .swatch .name { font-size: 12.5px; font-weight: 700; }
+  .swatch .hex {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .swatch .use {
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+  .swatch.kept .chip::after {
+    content: "据え置き";
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.85);
+    color: #444;
+  }
+
+  /* ---- Proposal-section theme override (scoped, not global) ---- */
+  .proposal {
+    --p-bg: #E7ECF1;
+    --p-paper: #F8FAFC;
+    --p-ink: #1B2733;
+    --p-ink-soft: #55666F;
+    --p-line: #D3DDE4;
+    --p-blue: #1E4E7A;
+    --p-blue-dark: #123252;
+    background: var(--p-bg);
+    border: 1px solid var(--p-line);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .proposal h2, .proposal .group-label, .proposal p.lead { color: var(--p-ink); }
+  .proposal .group-label, .proposal p.lead { color: var(--p-ink-soft); }
+  .proposal .swatch { background: var(--p-paper); border-color: var(--p-line); }
+  .proposal .swatch .name { color: var(--p-ink); }
+  .proposal .swatch .hex, .proposal .swatch .use { color: var(--p-ink-soft); }
+
+  /* comparison mock cards */
+  .mockrow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 24px;
+  }
+  .mockcard {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .mockcard .mocklabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    color: var(--ink-soft);
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .mockbody { padding: 18px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .seatcard {
+    width: 128px;
+    border-radius: 8px 8px 12px 12px;
+    padding: 12px 12px 10px;
+    font-size: 12px;
+  }
+  .seatcard .stitle { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .seatcard .stag { font-family: var(--mono); font-size: 10.5px; font-weight: 700; }
+
+  .fakebtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    height: fit-content;
+  }
+
+  footer {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    text-align: center;
+    max-width: 60ch;
+    line-height: 1.7;
+  }
+  footer code { font-family: var(--mono); font-size: 10.5px; }
+</style>
+
+<div class="page">
+  <header>
+    <h1>配色パレット</h1>
+    <p>現在アプリ全体(app.jsx / ledger.jsx / payroll.jsx)で使われている <code style="font-family:var(--mono)">COLORS</code> トークンの一覧と、青系に寄せた代替案です。ステータス色(緑=正常・黄=注意・赤=警告)は意味を持つ色のため据え置き、背景・文字・ブランドカラー(現行の深緑)を中心に置き換えています。</p>
+  </header>
+
+  <section>
+    <h2>現状の配色 <span class="en">current</span></h2>
+    <p class="lead">全体は温かみのあるクリーム紙(bg/paper)に、深緑(teal)を差し色として使う構成です。</p>
+
+    <div class="group-label">背景・罫線</div>
+    <div class="swatchgrid">
+      <div class="swatch">
+        <div class="chip" style="background:#EFEBE2"></div>
+        <div class="meta"><div class="name">bg</div><div class="hex">#EFEBE2</div><div class="use">アプリ全体の地色</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#FBF9F4"></div>
+        <div class="meta"><div class="name">paper</div><div class="hex">#FBF9F4</div><div class="use">カード・パネルの背景</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#DCD4C4"></div>
+        <div class="meta"><div class="name">line</div><div class="hex">#DCD4C4</div><div class="use">枠線・区切り線</div></div>
+      </div>
+    </div>
+
+    <div class="group-label">文字</div>
+    <div class="swatchgrid">
+      <div class="swatch">
+        <div class="chip" style="background:#20291F"></div>
+        <div class="meta"><div class="name">ink</div><div class="hex">#20291F</div><div class="use">本文・見出し</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#5B6459"></div>
+        <div class="meta"><div class="name">inkSoft</div><div class="hex">#5B6459</div><div class="use">補助テキスト・ラベル</div></div>
+      </div>
+    </div>
+
+    <div class="group-label">ブランド / 主要アクション</div>
+    <div class="swatchgrid">
+      <div class="swatch">
+        <div class="chip" style="background:#1D4E4B"></div>
+        <div class="meta"><div class="name">teal</div><div class="hex">#1D4E4B</div><div class="use">主要ボタン・選択中タブ・見出し帯</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#123634"></div>
+        <div class="meta"><div class="name">tealDark</div><div class="hex">#123634</div><div class="use">ヘッダー背景・トースト</div></div>
+      </div>
+    </div>
+
+    <div class="group-label">ステータス(緑=正常・黄=注意・赤=警告)</div>
+    <div class="swatchgrid">
+      <div class="swatch">
+        <div class="chip" style="background:#4F7A5C"></div>
+        <div class="meta"><div class="name">sage</div><div class="hex">#4F7A5C</div><div class="use">使用中30分未満・現金支払い</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#E4EEE3"></div>
+        <div class="meta"><div class="name">sageBg</div><div class="hex">#E4EEE3</div><div class="use">sageの背景色</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#C98A2B"></div>
+        <div class="meta"><div class="name">amber</div><div class="hex">#C98A2B</div><div class="use">使用中30〜60分・時間帯価格中</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#F7ECD8"></div>
+        <div class="meta"><div class="name">amberBg</div><div class="hex">#F7ECD8</div><div class="use">amberの背景色</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#B54834"></div>
+        <div class="meta"><div class="name">brick</div><div class="hex">#B54834</div><div class="use">使用中60分以上・削除/警告</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#F6E1DB"></div>
+        <div class="meta"><div class="name">brickBg</div><div class="hex">#F6E1DB</div><div class="use">brickの背景色</div></div>
+      </div>
+    </div>
+
+    <div class="group-label">グラフ専用(アルバイト集計の従業員別色分け)</div>
+    <div class="swatchgrid">
+      <div class="swatch">
+        <div class="chip" style="background:#7A6A4F"></div>
+        <div class="meta"><div class="name">(オリーブブラウン)</div><div class="hex">#7A6A4F</div><div class="use">従業員5人目以降の割当て色</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#3E6B7A"></div>
+        <div class="meta"><div class="name">(ティールブルー)</div><div class="hex">#3E6B7A</div><div class="use">同上</div></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background:#8C5A6B"></div>
+        <div class="meta"><div class="name">(プラム)</div><div class="hex">#8C5A6B</div><div class="use">同上</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="proposal">
+    <h2>青系の提案 <span class="en">proposal — navy</span></h2>
+    <p class="lead">深緑(teal)を紺系の青に、クリーム紙をわずかに冷たい白へ。ステータス色(緑/黄/赤)は意味が変わってしまうため据え置きを推奨します。</p>
+
+    <div class="group-label">背景・罫線</div>
+    <div class="swatchgrid">
+      <div class="swatch"><div class="chip" style="background:#E7ECF1"></div><div class="meta"><div class="name">bg</div><div class="hex">#E7ECF1</div><div class="use">アプリ全体の地色</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#F8FAFC"></div><div class="meta"><div class="name">paper</div><div class="hex">#F8FAFC</div><div class="use">カード・パネルの背景</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#D3DDE4"></div><div class="meta"><div class="name">line</div><div class="hex">#D3DDE4</div><div class="use">枠線・区切り線</div></div></div>
+    </div>
+
+    <div class="group-label">文字</div>
+    <div class="swatchgrid">
+      <div class="swatch"><div class="chip" style="background:#1B2733"></div><div class="meta"><div class="name">ink</div><div class="hex">#1B2733</div><div class="use">本文・見出し</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#55666F"></div><div class="meta"><div class="name">inkSoft</div><div class="hex">#55666F</div><div class="use">補助テキスト・ラベル</div></div></div>
+    </div>
+
+    <div class="group-label">ブランド / 主要アクション</div>
+    <div class="swatchgrid">
+      <div class="swatch"><div class="chip" style="background:#1E4E7A"></div><div class="meta"><div class="name">blue<span style="color:var(--p-ink-soft)"> (旧teal)</span></div><div class="hex">#1E4E7A</div><div class="use">主要ボタン・選択中タブ・見出し帯</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#123252"></div><div class="meta"><div class="name">blueDark<span style="color:var(--p-ink-soft)"> (旧tealDark)</span></div><div class="hex">#123252</div><div class="use">ヘッダー背景・トースト</div></div></div>
+    </div>
+
+    <div class="group-label">ステータス(据え置き — 意味を保つため変更なし)</div>
+    <div class="swatchgrid">
+      <div class="swatch kept"><div class="chip" style="background:#4F7A5C"></div><div class="meta"><div class="name">sage</div><div class="hex">#4F7A5C</div><div class="use">正常・現金支払い</div></div></div>
+      <div class="swatch kept"><div class="chip" style="background:#C98A2B"></div><div class="meta"><div class="name">amber</div><div class="hex">#C98A2B</div><div class="use">注意</div></div></div>
+      <div class="swatch kept"><div class="chip" style="background:#B54834"></div><div class="meta"><div class="name">brick</div><div class="hex">#B54834</div><div class="use">警告・削除</div></div></div>
+    </div>
+
+    <div class="mockrow">
+      <div class="mockcard">
+        <div class="mocklabel">現状</div>
+        <div class="mockbody" style="background:#EFEBE2">
+          <div class="seatcard" style="background:#FBF9F4;border:1.5px solid #4F7A5C;color:#20291F">
+            <div class="stitle">座席 1</div>
+            <div class="stag" style="color:#4F7A5C">● 使用中</div>
+          </div>
+          <div class="fakebtn" style="background:#1D4E4B;color:#FBF9F4">＋ 座席を追加</div>
+        </div>
+      </div>
+      <div class="mockcard">
+        <div class="mocklabel">青系提案</div>
+        <div class="mockbody" style="background:#E7ECF1">
+          <div class="seatcard" style="background:#F8FAFC;border:1.5px solid #4F7A5C;color:#1B2733">
+            <div class="stitle">座席 1</div>
+            <div class="stag" style="color:#4F7A5C">● 使用中</div>
+          </div>
+          <div class="fakebtn" style="background:#1E4E7A;color:#F8FAFC">＋ 座席を追加</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    青の彩度・明度は現行の <code>teal #1D4E4B</code> と揃えているため、コントラスト比や全体の落ち着いた印象は保たれます。適用する場合は <code>app.jsx</code> の <code>COLORS</code> オブジェクトの該当キーを差し替えるだけで、ボタン・タブ・グラフ配色に自動的に反映されます。
+  </footer>
+</div>
