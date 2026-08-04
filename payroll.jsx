@@ -423,6 +423,8 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   });
   list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
+  const totalAmount = list.reduce((sum, s) => sum + payrollShiftTotal(s, employees).total, 0);
+
   const exportShiftsCsv = () => {
     const rows = [["日付", "従業員", "開始", "終了", "勤務時間", "時給", "日給", "オプション1", "オプション2", "合計", "メモ"]];
     list.forEach((shift) => {
@@ -496,6 +498,20 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
           <Download size={14} />
           CSVダウンロード
         </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 20,
+          fontFamily: MONO,
+          fontSize: 12,
+          color: COLORS.inkSoft,
+          marginBottom: 12,
+        }}
+      >
+        <span>勤怠 {list.length}件</span>
+        <span>合計 {formatYen(totalAmount)}</span>
       </div>
 
       {list.length === 0 ? (
