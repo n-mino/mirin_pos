@@ -149,6 +149,12 @@ const Lock = makeIcon([
   { tag: "rect", attrs: { x: 3, y: 11, width: 18, height: 11, rx: 2 } },
   { tag: "path", attrs: { d: "M7 11V7a5 5 0 0 1 10 0v4" } },
 ]);
+const RefreshCw = makeIcon([
+  { tag: "path", attrs: { d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" } },
+  { tag: "path", attrs: { d: "M3 3v5h5" } },
+  { tag: "path", attrs: { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" } },
+  { tag: "path", attrs: { d: "M16 16h5v5" } },
+]);
 
 /* ---------------------------------------------------------
    デザイントークン(オーダーチケット / 伝票テイスト)
@@ -183,7 +189,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/04 19:22";
+const APP_LAST_UPDATED = "2026/08/10 15:15";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -1774,6 +1780,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const [taxInput, setTaxInput] = useState(String(data.taxRate ?? 0));
   const [warnInput, setWarnInput] = useState(String(data.seatToneThresholds?.warnMinutes ?? 30));
   const [dangerInput, setDangerInput] = useState(String(data.seatToneThresholds?.dangerMinutes ?? 60));
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [importError, setImportError] = useState("");
   const [importOk, setImportOk] = useState("");
   const [storageEstimate, setStorageEstimate] = useState(null);
@@ -1895,6 +1902,39 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
     showToast("保存しました");
   };
 
+  // 新しいService Workerの取得を明示的にチェックし、実際に有効化されて
+  // ページの制御を引き継いだ(=更新があった)ことを検知したら「更新しました」を
+  // 表示してからリロードする。一定時間待っても引き継ぎが起きなければ
+  // 「新しい更新はありません」を表示するのみでリロードはしない。
+  const handleAppUpdate = () => {
+    if (!("serviceWorker" in navigator)) {
+      showToast("新しい更新はありません");
+      return;
+    }
+    setCheckingUpdate(true);
+    let done = false;
+    const onUpdated = () => {
+      if (done) return;
+      done = true;
+      setCheckingUpdate(false);
+      showToast("更新しました");
+      setTimeout(() => window.location.reload(), 1200);
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", onUpdated, { once: true });
+    navigator.serviceWorker.getRegistration()
+      .then((reg) => reg && reg.update())
+      .catch(() => {})
+      .finally(() => {
+        setTimeout(() => {
+          if (done) return;
+          done = true;
+          navigator.serviceWorker.removeEventListener("controllerchange", onUpdated);
+          setCheckingUpdate(false);
+          showToast("新しい更新はありません");
+        }, 8000);
+      });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header title="マスタ設定" onBack={onBack} />
@@ -1920,8 +1960,32 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             {t.label}
           </button>
         ))}
-        <div style={{ marginLeft: "auto", flexShrink: 0, alignSelf: "center", paddingLeft: 12, fontSize: 11, fontFamily: MONO, color: COLORS.inkSoft, whiteSpace: "nowrap" }}>
-          最終更新: {APP_LAST_UPDATED}
+        <div style={{ marginLeft: "auto", flexShrink: 0, alignSelf: "center", display: "flex", alignItems: "center", gap: 10, paddingLeft: 12 }}>
+          <div style={{ fontSize: 11, fontFamily: MONO, color: COLORS.inkSoft, whiteSpace: "nowrap" }}>
+            最終更新: {APP_LAST_UPDATED}
+          </div>
+          <button
+            onClick={handleAppUpdate}
+            disabled={checkingUpdate}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "5px 10px",
+              borderRadius: 14,
+              border: `1.5px solid ${COLORS.line}`,
+              background: "transparent",
+              color: COLORS.inkSoft,
+              fontSize: 11,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              cursor: checkingUpdate ? "default" : "pointer",
+              opacity: checkingUpdate ? 0.6 : 1,
+            }}
+          >
+            <RefreshCw size={11} />
+            {checkingUpdate ? "更新確認中…" : "アプリ更新"}
+          </button>
         </div>
       </div>
 
