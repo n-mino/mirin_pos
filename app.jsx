@@ -155,6 +155,10 @@ const RefreshCw = makeIcon([
   { tag: "path", attrs: { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" } },
   { tag: "path", attrs: { d: "M16 16h5v5" } },
 ]);
+const Ban = makeIcon([
+  { tag: "circle", attrs: { cx: 12, cy: 12, r: 10 } },
+  { tag: "path", attrs: { d: "m4.9 4.9 14.2 14.2" } },
+]);
 
 /* ---------------------------------------------------------
    デザイントークン(オーダーチケット / 伝票テイスト)
@@ -189,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/10 15:42";
+const APP_LAST_UPDATED = "2026/08/12 17:06";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -1089,16 +1093,21 @@ function OrderScreen({ seatNum, seatName, seat, products, now, onUpdateOrders, o
                   <button
                     key={p.id}
                     onClick={() => addProduct(p)}
+                    disabled={p.soldOut}
                     style={{
-                      background: active ? COLORS.amberBg : COLORS.paper,
-                      border: `1.5px solid ${active ? COLORS.amber : COLORS.line}`,
+                      background: p.soldOut ? COLORS.line : (active ? COLORS.amberBg : COLORS.paper),
+                      border: `1.5px solid ${p.soldOut ? COLORS.line : (active ? COLORS.amber : COLORS.line)}`,
                       borderRadius: 8,
                       padding: "14px 10px",
                       textAlign: "left",
-                      cursor: "pointer",
+                      cursor: p.soldOut ? "not-allowed" : "pointer",
+                      opacity: p.soldOut ? 0.55 : 1,
                     }}
                   >
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>{p.name}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>
+                      {p.name}
+                      {p.soldOut && <span style={{ fontFamily: MONO, fontWeight: 700 }}>(売り切れ)</span>}
+                    </div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                       <span style={{ fontFamily: MONO, fontSize: 13, color: active ? COLORS.amber : COLORS.teal, fontWeight: 700 }}>
                         {formatYen(effectivePrice)}
@@ -1886,6 +1895,10 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
     onUpdateProducts(data.products.filter((p) => p.id !== id));
   };
 
+  const toggleSoldOut = (id) => {
+    onUpdateProducts(data.products.map((p) => (p.id === id ? { ...p, soldOut: !p.soldOut } : p)));
+  };
+
   const addSeat = () => {
     onUpdateSeatCount(Math.min(200, data.seatCount + 1));
   };
@@ -2021,8 +2034,15 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
                     padding: "10px 14px",
                   }}
                 >
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{p.name}</div>
+                  <div style={{ opacity: p.soldOut ? 0.5 : 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{p.name}</div>
+                      {p.soldOut && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.brick, border: `1px solid ${COLORS.brick}`, borderRadius: 4, padding: "1px 5px" }}>
+                          売り切れ
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 12, color: COLORS.inkSoft, fontFamily: MONO }}>{p.category} ・ {formatYen(p.price)}</div>
                     {p.timePrice && (
                       <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: COLORS.amber, fontFamily: MONO, marginTop: 3 }}>
@@ -2031,6 +2051,24 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => toggleSoldOut(p.id)}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 6,
+                        border: `1px solid ${p.soldOut ? COLORS.amber : COLORS.line}`,
+                        background: p.soldOut ? COLORS.amber : "transparent",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: p.soldOut ? "#FBF9F4" : COLORS.inkSoft,
+                      }}
+                      title="売り切れ"
+                    >
+                      <Ban size={14} />
+                    </button>
                     <button onClick={() => setEditing(p)} style={{ width: 32, height: 32, borderRadius: 6, border: `1px solid ${COLORS.line}`, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <Pencil size={14} />
                     </button>
