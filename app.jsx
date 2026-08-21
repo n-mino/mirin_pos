@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/21 19:29";
+const APP_LAST_UPDATED = "2026/08/21 20:53";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -377,7 +377,7 @@ function recentMonthsCutoff(months) {
 }
 
 // バックアップJSON(restored)から、直近Nヶ月分の売上履歴・勤怠・入出金のみを抽出する
-// (期間指定復元用。商品・座席・設定などのマスタはこの関数の対象外)
+// (期間指定復元用。商品・座席・設定などのマスタはこの関数の対象外で、期間を絞らずそのまま全件復元される)
 function filterRestoreDataByMonths(restored, months) {
   const cutoff = recentMonthsCutoff(months);
   const salesHistory = (restored.salesHistory || []).filter((s) => toDateInputValue(s.endTime) >= cutoff);
@@ -1796,7 +1796,7 @@ function UserGuidePanel() {
           この端末での使用容量の確認、全データのJSONファイルへの書き出し(バックアップ)、書き出したJSONファイルからの復元、全データの削除ができます。書き出し・復元・削除はいずれもパスワードで保護されています(パスワードはアプリ制作者に確認してください)。アプリデータの容量が目安を超えると、この画面に注意・警告の表示が出ます。特に「全データ削除」はこの端末のすべてのデータを初期状態に戻す取り消せない操作のため、実行前に必ずバックアップを書き出してください。
         </GuideItem>
         <GuideItem label="バックアップの復元(全件復元/期間指定)">
-          復元前に「全件復元」「期間指定」のどちらかを選びます。「全件復元」は商品・座席・設定を含む現在のすべてのデータを削除し、選択したファイルの内容にまるごと置き換えます。「期間指定」は商品・座席・設定などは今のまま残し、売上履歴・勤怠・入出金だけをすべて削除したうえで、選択したファイルに含まれる直近1・3・6ヶ月のいずれかの期間分のみを復元します(容量が多くなってきた際に、マスタ設定を保ったまま直近データだけ残したい場合に使えます)。いずれもファイルを選択すると、実際に削除・復元される件数が確認画面に表示されるので、内容を確認してから実行してください。
+          復元前に「全件復元」「期間指定」のどちらかを選びます。どちらも商品・座席・アルバイトマスタ・設定などは選択したファイルの内容にまるごと置き換わります(現在使用中の座席は復元対象外)。「全件復元」は売上履歴・勤怠・入出金もすべて選択したファイルの内容で復元しますが、「期間指定」はこの3つだけ、選択したファイルに含まれる直近1・3・6ヶ月のいずれかの期間分のみを復元します(容量が多くなってきた際に、事前にバックアップを書き出してから「全データ削除」→「期間指定」で復元すると、マスタは保ったまま直近データだけ残せます)。いずれもファイルを選択すると、実際に削除・復元される件数が確認画面に表示されるので、内容を確認してから実行してください。
         </GuideItem>
         <GuideItem label="アプリ更新">
           タブ行右上の「アプリ更新」ボタンを押すと、新しいバージョンが公開されていないか確認し、あれば自動的に読み込み直します(更新がない場合は「新しい更新はありません」と表示されます)。ホーム画面に追加した場合、通常はアプリを完全に終了してから開き直さないと更新が反映されませんが、このボタンでその手間を省けます。
@@ -1902,7 +1902,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
         }
         if (restoreMode === "period") {
           const filtered = filterRestoreDataByMonths(restored, restoreMonths);
-          setPendingRestoreConfirm({ mode: "period", filtered, months: restoreMonths });
+          setPendingRestoreConfirm({ mode: "period", restored, filtered, months: restoreMonths });
         } else {
           setPendingRestoreConfirm({ mode: "full", restored });
         }
@@ -2363,8 +2363,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             <div>
               <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 8 }}>バックアップの復元</div>
               <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 10, lineHeight: 1.6 }}>
-                「全件復元」は商品・座席・設定を含む現在のすべてのデータを削除し、選択したファイルの内容にまるごと置き換えます。
-                「期間指定」は商品・座席・設定などは今のまま残し、売上履歴・勤怠・入出金だけを全件削除したうえで、選択したファイルに含まれる直近の期間分のみを復元します。いずれも取り消せません。
+                「全件復元」は現在のすべてのデータを削除し、選択したファイルの内容にまるごと置き換えます。
+                「期間指定」も商品・座席・設定などのマスタは選択したファイルの内容に置き換わりますが、売上履歴・勤怠・入出金だけは直近の期間(1・3・6ヶ月)分のみを復元します(容量を空けたいときにおすすめです)。いずれも取り消せません。
               </div>
 
               <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
@@ -2474,7 +2474,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
           title="期間指定で復元"
           message={
             <>
-              商品・座席・設定などは今のまま残し、売上履歴・勤怠・入出金はすべて削除したうえで、選択したファイルから直近{pendingRestoreConfirm.months}ヶ月分のみを復元します。この操作は取り消せません。
+              現在この端末にある商品・座席・設定などのマスタ、および売上履歴・勤怠・入出金をすべて削除し、選択したファイルの内容で復元します(現在使用中の座席は復元対象外です)。ただし売上履歴・勤怠・入出金は、直近{pendingRestoreConfirm.months}ヶ月分のみを復元します。この操作は取り消せません。
               <br /><br />
               復元されるデータ件数
               <br />
@@ -2490,8 +2490,8 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
           confirmLabel="復元する"
           onCancel={() => setPendingRestoreConfirm(null)}
           onConfirm={() => {
-            const { filtered, months } = pendingRestoreConfirm;
-            onImportDataPeriod(filtered);
+            const { restored, filtered, months } = pendingRestoreConfirm;
+            onImportDataPeriod(restored, filtered);
             setPendingRestoreConfirm(null);
             const msg = `直近${months}ヶ月分(売上履歴${filtered.salesHistory.length}件・勤怠${filtered.shifts.length}件・入出金${Object.keys(filtered.cashFlowRecords).length}日分)を復元しました`;
             setImportOk(msg);
@@ -2981,11 +2981,13 @@ function App() {
             persist({ ...dataRef.current, seatToneThresholds: { warnMinutes: warn, dangerMinutes: danger } })
           }
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
-          onImportDataPeriod={(filtered) =>
+          onImportDataPeriod={(restored, filtered) =>
             persist({
-              ...dataRef.current,
+              ...defaultData(),
+              ...restored,
+              seats: dataRef.current.seats, // 現在使用中の座席(営業中データ)は復元対象外
               salesHistory: filtered.salesHistory,
-              payroll: { ...dataRef.current.payroll, shifts: filtered.shifts },
+              payroll: { ...defaultData().payroll, ...restored.payroll, shifts: filtered.shifts },
               cashFlow: { records: filtered.cashFlowRecords },
             })
           }
