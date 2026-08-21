@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/12 17:06";
+const APP_LAST_UPDATED = "2026/08/21 19:29";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -247,6 +247,11 @@ const SECURITY_SCREEN_ORDER = ["salesManagement", "payroll"];
 const SECURITY_SCREEN_LABELS = { salesManagement: "売上管理", payroll: "アルバイト管理" };
 const SECURITY_RESET_KEYWORD = "09044249596";
 const SETTINGS_ADMIN_PASSWORD = "mrn"; // 「パスワード設定」タブ・JSON書き出しを保護する固定パスワード
+
+// アプリデータ本体(localStorage)の容量の目安。ブラウザが保証する値ではなく、
+// Chromium系ブラウザのlocalStorage上限(オリジンあたり5MB程度)を踏まえた保守的な目安値。
+const APP_DATA_WARN_BYTES = 3 * 1024 * 1024; // 3MB: 注意
+const APP_DATA_DANGER_BYTES = 4 * 1024 * 1024; // 4MB: 危険
 
 function uid(prefix = "id") {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -362,6 +367,26 @@ function toDateInputValue(iso) {
 
 function isSameDate(iso, dateStr) {
   return toDateInputValue(iso) === dateStr;
+}
+
+// 「直近Nヶ月」の起点日(YYYY-MM-DD、操作時点を起点に月単位で遡る)を返す
+function recentMonthsCutoff(months) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return toDateInputValue(d);
+}
+
+// バックアップJSON(restored)から、直近Nヶ月分の売上履歴・勤怠・入出金のみを抽出する
+// (期間指定復元用。商品・座席・設定などのマスタはこの関数の対象外)
+function filterRestoreDataByMonths(restored, months) {
+  const cutoff = recentMonthsCutoff(months);
+  const salesHistory = (restored.salesHistory || []).filter((s) => toDateInputValue(s.endTime) >= cutoff);
+  const shifts = ((restored.payroll && restored.payroll.shifts) || []).filter((s) => s.date >= cutoff);
+  const cashFlowRecords = {};
+  Object.entries((restored.cashFlow && restored.cashFlow.records) || {}).forEach(([dateKey, v]) => {
+    if (dateKey >= cutoff) cashFlowRecords[dateKey] = v;
+  });
+  return { salesHistory, shifts, cashFlowRecords };
 }
 
 function formatDateTimeShort(iso) {
@@ -1768,7 +1793,10 @@ function UserGuidePanel() {
           売上管理・アルバイト管理の2画面それぞれにパスワードを設定できます(売上履歴は売上管理内のタブのため、売上管理のパスワードが適用されます)。両方に設定する場合は「共通のパスワード」か「画面ごとに個別」かを選べます。「ロックのタイミング」では、アプリ起動中は初回のみ確認するか、画面を開くたび毎回確認するかを選べます。パスワードを忘れた場合は、この画面下部の「パスワードをリセット」から専用のキーワードを入力するとすべての設定を解除できます。このリセット用キーワード、および「パスワード設定」タブ自体を開くためのパスワードは、アプリ制作者に確認してください。
         </GuideItem>
         <GuideItem label="データ管理">
-          この端末での使用容量の確認、全データのJSONファイルへの書き出し(バックアップ)、書き出したJSONファイルからの復元、全データの削除ができます。書き出し・復元・削除はいずれもパスワードで保護されています(パスワードはアプリ制作者に確認してください)。特に「全データ削除」はこの端末のすべてのデータを初期状態に戻す取り消せない操作のため、実行前に必ずバックアップを書き出してください。
+          この端末での使用容量の確認、全データのJSONファイルへの書き出し(バックアップ)、書き出したJSONファイルからの復元、全データの削除ができます。書き出し・復元・削除はいずれもパスワードで保護されています(パスワードはアプリ制作者に確認してください)。アプリデータの容量が目安を超えると、この画面に注意・警告の表示が出ます。特に「全データ削除」はこの端末のすべてのデータを初期状態に戻す取り消せない操作のため、実行前に必ずバックアップを書き出してください。
+        </GuideItem>
+        <GuideItem label="バックアップの復元(全件復元/期間指定)">
+          復元前に「全件復元」「期間指定」のどちらかを選びます。「全件復元」は商品・座席・設定を含む現在のすべてのデータを削除し、選択したファイルの内容にまるごと置き換えます。「期間指定」は商品・座席・設定などは今のまま残し、売上履歴・勤怠・入出金だけをすべて削除したうえで、選択したファイルに含まれる直近1・3・6ヶ月のいずれかの期間分のみを復元します(容量が多くなってきた際に、マスタ設定を保ったまま直近データだけ残したい場合に使えます)。いずれもファイルを選択すると、実際に削除・復元される件数が確認画面に表示されるので、内容を確認してから実行してください。
         </GuideItem>
         <GuideItem label="アプリ更新">
           タブ行右上の「アプリ更新」ボタンを押すと、新しいバージョンが公開されていないか確認し、あれば自動的に読み込み直します(更新がない場合は「新しい更新はありません」と表示されます)。ホーム画面に追加した場合、通常はアプリを完全に終了してから開き直さないと更新が反映されませんが、このボタンでその手間を省けます。
@@ -1793,7 +1821,7 @@ function UserGuidePanel() {
 /* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
-function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onUpdateSeatToneThresholds, onImportData, onDeleteAllData, onUpdateSecurity, onResetSecurity, showToast }) {
+function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onUpdateSeatToneThresholds, onImportData, onImportDataPeriod, onDeleteAllData, onUpdateSecurity, onResetSecurity, showToast }) {
   const isNarrow = useMediaQuery("(max-width: 720px)");
   const [tab, setTab] = useState("products");
   const [editing, setEditing] = useState(null); // product being edited, or {} for new
@@ -1812,6 +1840,9 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
   const [pendingDeleteAllConfirm, setPendingDeleteAllConfirm] = useState(false);
   const [pendingRestorePassword, setPendingRestorePassword] = useState(false);
   const [restoreFileName, setRestoreFileName] = useState("");
+  const [restoreMode, setRestoreMode] = useState("full"); // "full" | "period"
+  const [restoreMonths, setRestoreMonths] = useState(1); // 1 | 3 | 6
+  const [pendingRestoreConfirm, setPendingRestoreConfirm] = useState(null); // 復元確認モーダル用の情報
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -1869,8 +1900,12 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
           });
           restored.security = { ...restored.security, passwords: normalized };
         }
-        onImportData(restored);
-        setImportOk("データを復元しました");
+        if (restoreMode === "period") {
+          const filtered = filterRestoreDataByMonths(restored, restoreMonths);
+          setPendingRestoreConfirm({ mode: "period", filtered, months: restoreMonths });
+        } else {
+          setPendingRestoreConfirm({ mode: "full", restored });
+        }
       } catch (err) {
         setImportError("ファイルを読み込めませんでした。バックアップ用のJSONファイルを選択してください。");
       } finally {
@@ -2292,6 +2327,23 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
                   <div style={{ fontSize: 10.5, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.5 }}>
                     ※「ブラウザでの使用量」はReact本体等のオフラインキャッシュも含むこのアプリ全体の使用量、「アプリデータ本体」はバックアップに書き出される実データのみのサイズです。
                   </div>
+
+                  {appDataBytes >= APP_DATA_DANGER_BYTES && (
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 12, padding: "8px 10px", background: COLORS.brickBg, borderRadius: 6 }}>
+                      <AlertCircle size={14} color={COLORS.brick} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <span style={{ fontSize: 11.5, color: COLORS.brick, fontWeight: 700, lineHeight: 1.5 }}>
+                        アプリデータの容量が多くなっています。バックアップを書き出したうえで、古い売上履歴・勤怠・入出金データの整理をおすすめします。
+                      </span>
+                    </div>
+                  )}
+                  {appDataBytes >= APP_DATA_WARN_BYTES && appDataBytes < APP_DATA_DANGER_BYTES && (
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 12, padding: "8px 10px", background: COLORS.amberBg, borderRadius: 6 }}>
+                      <AlertCircle size={14} color={COLORS.amber} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <span style={{ fontSize: 11.5, color: COLORS.amber, fontWeight: 700, lineHeight: 1.5 }}>
+                        アプリデータの容量がやや多くなってきています。念のためバックアップの書き出しをおすすめします。
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -2311,8 +2363,22 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             <div>
               <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 8 }}>バックアップの復元</div>
               <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 10, lineHeight: 1.6 }}>
-                書き出したJSONファイルを選択すると、現在この端末にあるデータを上書きします。この操作は取り消せません。
+                「全件復元」は商品・座席・設定を含む現在のすべてのデータを削除し、選択したファイルの内容にまるごと置き換えます。
+                「期間指定」は商品・座席・設定などは今のまま残し、売上履歴・勤怠・入出金だけを全件削除したうえで、選択したファイルに含まれる直近の期間分のみを復元します。いずれも取り消せません。
               </div>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                <button onClick={() => setRestoreMode("full")} style={salesTabPillStyle(restoreMode === "full")}>全件復元</button>
+                <button onClick={() => setRestoreMode("period")} style={salesTabPillStyle(restoreMode === "period")}>期間指定</button>
+              </div>
+              {restoreMode === "period" && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                  {[1, 3, 6].map((m) => (
+                    <button key={m} onClick={() => setRestoreMonths(m)} style={salesTabPillStyle(restoreMonths === m)}>直近{m}ヶ月</button>
+                  ))}
+                </div>
+              )}
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2385,6 +2451,52 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
           stored={encodePassword(SETTINGS_ADMIN_PASSWORD)}
           onCancel={() => setPendingRestorePassword(false)}
           onSuccess={() => { setPendingRestorePassword(false); fileInputRef.current?.click(); }}
+        />
+      )}
+
+      {pendingRestoreConfirm && pendingRestoreConfirm.mode === "full" && (
+        <ConfirmModal
+          title="全件復元"
+          message="現在この端末にある商品・座席・売上履歴・設定などすべてのデータを削除し、選択したファイルの内容で復元します。この操作は取り消せません。よろしいですか?"
+          confirmLabel="復元する"
+          onCancel={() => setPendingRestoreConfirm(null)}
+          onConfirm={() => {
+            onImportData(pendingRestoreConfirm.restored);
+            setPendingRestoreConfirm(null);
+            setImportOk("データを復元しました");
+            showToast("データを復元しました");
+          }}
+        />
+      )}
+
+      {pendingRestoreConfirm && pendingRestoreConfirm.mode === "period" && (
+        <ConfirmModal
+          title="期間指定で復元"
+          message={
+            <>
+              商品・座席・設定などは今のまま残し、売上履歴・勤怠・入出金はすべて削除したうえで、選択したファイルから直近{pendingRestoreConfirm.months}ヶ月分のみを復元します。この操作は取り消せません。
+              <br /><br />
+              復元されるデータ件数
+              <br />
+              ・売上履歴: {pendingRestoreConfirm.filtered.salesHistory.length}件
+              <br />
+              ・勤怠: {pendingRestoreConfirm.filtered.shifts.length}件
+              <br />
+              ・入出金: {Object.keys(pendingRestoreConfirm.filtered.cashFlowRecords).length}日分
+              <br /><br />
+              よろしいですか?
+            </>
+          }
+          confirmLabel="復元する"
+          onCancel={() => setPendingRestoreConfirm(null)}
+          onConfirm={() => {
+            const { filtered, months } = pendingRestoreConfirm;
+            onImportDataPeriod(filtered);
+            setPendingRestoreConfirm(null);
+            const msg = `直近${months}ヶ月分(売上履歴${filtered.salesHistory.length}件・勤怠${filtered.shifts.length}件・入出金${Object.keys(filtered.cashFlowRecords).length}日分)を復元しました`;
+            setImportOk(msg);
+            showToast(msg);
+          }}
         />
       )}
 
@@ -2869,6 +2981,14 @@ function App() {
             persist({ ...dataRef.current, seatToneThresholds: { warnMinutes: warn, dangerMinutes: danger } })
           }
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
+          onImportDataPeriod={(filtered) =>
+            persist({
+              ...dataRef.current,
+              salesHistory: filtered.salesHistory,
+              payroll: { ...dataRef.current.payroll, shifts: filtered.shifts },
+              cashFlow: { records: filtered.cashFlowRecords },
+            })
+          }
           onDeleteAllData={() => persist(defaultData())}
           onUpdateSecurity={onUpdateSecurity}
           onResetSecurity={onResetSecurity}
