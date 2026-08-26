@@ -308,7 +308,7 @@ function DailySalesTable({ sales }) {
   );
 }
 
-function DailyShiftTable({ shifts, employees }) {
+function DailyShiftTable({ shifts, employees, rankBonusRates }) {
   if (shifts.length === 0) {
     return <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "16px 0", textAlign: "center" }}>勤怠記録がまだありません。</div>;
   }
@@ -340,14 +340,14 @@ function DailyShiftTable({ shifts, employees }) {
           <div>時給</div>
           <div>ランク</div>
           <div>日給</div>
-          <div>オプション１</div>
-          <div>オプション２</div>
+          <div>同伴バック</div>
+          <div>売上バック</div>
           <div>合計</div>
           <div>メモ</div>
         </div>
         {shifts.map((shift) => {
           const emp = employees.find((e) => e.id === shift.employeeId);
-          const { hours, total, wage } = payrollShiftTotal(shift, employees);
+          const { hours, total, wage } = payrollShiftTotal(shift, employees, rankBonusRates);
           return (
             <div
               key={shift.id}
@@ -370,9 +370,9 @@ function DailyShiftTable({ shifts, employees }) {
               <div>{formatHours(hours)}</div>
               <div>{emp ? formatYen(wage) : "-"}</div>
               <div>
-                {shift.rank ? (
-                  <span style={{ color: shift.rank === 2 ? COLORS.brick : COLORS.amber, fontWeight: 700 }}>
-                    {payrollRankLabel(shift.rank)}
+                {shift.rankKey ? (
+                  <span style={{ color: payrollRankColor(shift.rankKey), fontWeight: 700 }}>
+                    {payrollRankLabel(shift.rankKey)}
                   </span>
                 ) : "-"}
               </div>
@@ -402,9 +402,9 @@ function escapeHtml(value) {
 // 現在の画面(flex/overflow:autoの入れ子レイアウト)をそのまま印刷すると
 // スクロール領域からはみ出た部分が切れてしまうため、印刷専用の単純なHTMLを
 // 新しいウィンドウに組み立てて印刷する方式にしている。
-function printDailySummary({ targetDate, summaryRows, remaining, expenses, income, sales, shifts, employees }) {
+function printDailySummary({ targetDate, summaryRows, remaining, expenses, income, sales, shifts, employees, rankBonusRates }) {
   const salesTotal = sales.reduce((sum, s) => sum + s.total, 0);
-  const shiftsTotal = shifts.reduce((sum, s) => sum + payrollShiftTotal(s, employees).total, 0);
+  const shiftsTotal = shifts.reduce((sum, s) => sum + payrollShiftTotal(s, employees, rankBonusRates).total, 0);
 
   const style = `
     body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif; color: #20291F; padding: 24px; }
@@ -472,7 +472,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
     ? `<tr><td colspan="11" style="text-align:center;color:#5B6459">勤怠記録がまだありません。</td></tr>`
     : shifts.map((shift) => {
       const emp = employees.find((e) => e.id === shift.employeeId);
-      const { hours, total, wage } = payrollShiftTotal(shift, employees);
+      const { hours, total, wage } = payrollShiftTotal(shift, employees, rankBonusRates);
       return `
         <tr>
           <td>${escapeHtml(shift.date)}</td>
@@ -480,7 +480,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
           <td>${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)}</td>
           <td class="num">${escapeHtml(formatHours(hours))}</td>
           <td class="num">${emp ? escapeHtml(formatYen(wage)) : "-"}</td>
-          <td>${escapeHtml(payrollRankLabel(shift.rank))}</td>
+          <td>${escapeHtml(payrollRankLabel(shift.rankKey))}</td>
           <td class="num">${shift.dailyWage > 0 ? escapeHtml(formatYen(shift.dailyWage)) : "-"}</td>
           <td class="num">${shift.option > 0 ? escapeHtml(formatYen(shift.option)) : "-"}</td>
           <td class="num">${shift.option2 > 0 ? escapeHtml(formatYen(shift.option2)) : "-"}</td>
@@ -523,7 +523,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   <h2>勤怠一覧</h2>
   <div class="sub">勤怠 ${shifts.length}件　合計 ${escapeHtml(formatYen(shiftsTotal))}</div>
   <table>
-    <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>ランク</th><th>日給</th><th>オプション1</th><th>オプション2</th><th>合計</th><th>メモ</th></tr></thead>
+    <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>ランク</th><th>日給</th><th>同伴バック</th><th>売上バック</th><th>合計</th><th>メモ</th></tr></thead>
     <tbody>${shiftRowsHtml}</tbody>
   </table>
 </body></html>`;
@@ -559,7 +559,8 @@ function DailySummaryPanel({ data }) {
   const onAccount = sales.reduce((sum, s) => sum + (s.payments?.onAccount || 0), 0);
   const totalSales = cash + card + paypay + onAccount;
   const salesTotal = sales.reduce((sum, s) => sum + s.total, 0);
-  const laborCost = shifts.reduce((sum, s) => sum + payrollShiftTotal(s, employees).total, 0);
+  const rankBonusRates = data.payroll.rankBonusRates;
+  const laborCost = shifts.reduce((sum, s) => sum + payrollShiftTotal(s, employees, rankBonusRates).total, 0);
   const expensesTotal = cashFlowTotal(record.expenses);
   const incomeTotal = cashFlowTotal(record.income);
   const remaining = cash - laborCost - expensesTotal + incomeTotal;
@@ -599,7 +600,7 @@ function DailySummaryPanel({ data }) {
           />
         </div>
         <button
-          onClick={() => printDailySummary({ targetDate, summaryRows, remaining, expenses: record.expenses, income: record.income, sales, shifts, employees })}
+          onClick={() => printDailySummary({ targetDate, summaryRows, remaining, expenses: record.expenses, income: record.income, sales, shifts, employees, rankBonusRates })}
           style={{
             marginLeft: "auto",
             display: "flex",
@@ -675,7 +676,7 @@ function DailySummaryPanel({ data }) {
           <span>勤怠 {shifts.length}件</span>
           <span>合計 {formatYen(laborCost)}</span>
         </div>
-        <DailyShiftTable shifts={shifts} employees={employees} />
+        <DailyShiftTable shifts={shifts} employees={employees} rankBonusRates={rankBonusRates} />
       </div>
     </div>
   );
