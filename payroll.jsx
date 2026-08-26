@@ -539,7 +539,7 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
 /* ---------------------------------------------------------
    勤怠一覧
 --------------------------------------------------------- */
-const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 100px 70px";
+const SHIFT_TABLE_COLS = "70px 90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 100px";
 
 function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, onTogglePaid }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
@@ -675,6 +675,7 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, o
                 fontWeight: 700,
               }}
             >
+              <div>操作</div>
               <div>日付</div>
               <div>従業員</div>
               <div>時間</div>
@@ -687,7 +688,6 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, o
               <div>合計</div>
               <div>メモ</div>
               <div>支払日</div>
-              <div>操作</div>
             </div>
             {list.map((shift) => {
               const emp = employees.find((e) => e.id === shift.employeeId);
@@ -706,6 +706,28 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, o
                     alignItems: "center",
                   }}
                 >
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button
+                      onClick={() => onTogglePaid(shift.id)}
+                      title={shift.paidDate ? "支払い済みを解除" : "支払い済みにする"}
+                      style={{
+                        ...payrollIconBtnStyle,
+                        width: 26,
+                        height: 26,
+                        background: shift.paidDate ? COLORS.sage : "transparent",
+                        border: `1px solid ${shift.paidDate ? COLORS.sage : COLORS.line}`,
+                        color: shift.paidDate ? COLORS.paper : COLORS.inkSoft,
+                      }}
+                    >
+                      <Banknote size={12} />
+                    </button>
+                    <button onClick={() => onEdit(shift.id)} style={{ ...payrollIconBtnStyle, width: 26, height: 26 }}>
+                      <Pencil size={12} />
+                    </button>
+                    <button onClick={() => setDeletingShiftId(shift.id)} style={{ ...payrollIconBtnStyle, width: 26, height: 26, border: `1px solid ${COLORS.brick}`, color: COLORS.brick }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                   <div style={{ fontFamily: SANS, color: COLORS.ink }}>{shift.date}</div>
                   <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {emp ? emp.name : "(削除済み)"}
@@ -729,28 +751,6 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, o
                   </div>
                   <div style={{ fontFamily: SANS, color: shift.paidDate ? COLORS.sage : COLORS.inkSoft, fontWeight: shift.paidDate ? 700 : 400 }}>
                     {shift.paidDate || "-"}
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button
-                      onClick={() => onTogglePaid(shift.id)}
-                      title={shift.paidDate ? "支払い済みを解除" : "支払い済みにする"}
-                      style={{
-                        ...payrollIconBtnStyle,
-                        width: 26,
-                        height: 26,
-                        background: shift.paidDate ? COLORS.sage : "transparent",
-                        border: `1px solid ${shift.paidDate ? COLORS.sage : COLORS.line}`,
-                        color: shift.paidDate ? COLORS.paper : COLORS.inkSoft,
-                      }}
-                    >
-                      <Banknote size={12} />
-                    </button>
-                    <button onClick={() => onEdit(shift.id)} style={{ ...payrollIconBtnStyle, width: 26, height: 26 }}>
-                      <Pencil size={12} />
-                    </button>
-                    <button onClick={() => setDeletingShiftId(shift.id)} style={{ ...payrollIconBtnStyle, width: 26, height: 26, border: `1px solid ${COLORS.brick}`, color: COLORS.brick }}>
-                      <Trash2 size={12} />
-                    </button>
                   </div>
                 </div>
               );

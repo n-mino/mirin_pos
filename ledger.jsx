@@ -314,12 +314,12 @@ function DailyShiftTable({ shifts, employees, rankBonusRates }) {
   if (shifts.length === 0) {
     return <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "16px 0", textAlign: "center" }}>勤怠記録がまだありません。</div>;
   }
-  // 勤怠一覧(SHIFT_TABLE_COLS)から末尾の「操作」列(編集・削除ボタン)を除いた列幅。
+  // 勤怠一覧(SHIFT_TABLE_COLS)から先頭の「操作」列(支払い/編集・削除ボタン)を除いた列幅。
   // 日次集計は閲覧専用のため編集操作は持たせない(編集は勤怠入力/一覧画面で行う)。
   // SHIFT_TABLE_COLSはpayroll.jsx側のグローバルで、このファイルより後に
   // 読み込まれるため、モジュールのトップレベルではなくレンダー時(関数内)で
   // 参照すること(トップレベルで参照すると読み込み順序の関係でエラーになる)。
-  const dailyShiftTableCols = SHIFT_TABLE_COLS.split(" ").slice(0, -1).join(" ");
+  const dailyShiftTableCols = SHIFT_TABLE_COLS.split(" ").slice(1).join(" ");
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ minWidth: 1020 }}>
