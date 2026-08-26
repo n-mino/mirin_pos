@@ -436,7 +436,7 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
 
       {employees.length === 0 ? (
         <div style={{ color: COLORS.inkSoft, fontSize: 13, padding: "20px 0", textAlign: "center" }}>
-          先に「アルバイトマスタ」タブでスタッフを登録してください。
+          先にマスタ設定の「アルバイトマスタ」でスタッフを登録してください。
         </div>
       ) : (
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -539,7 +539,7 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
 /* ---------------------------------------------------------
    勤怠一覧
 --------------------------------------------------------- */
-const SHIFT_TABLE_COLS = "70px 90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 100px";
+const SHIFT_TABLE_COLS = "100px 90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 100px";
 
 function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, onTogglePaid }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
@@ -662,7 +662,7 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, o
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 1180 }}>
+          <div style={{ minWidth: 1210 }}>
             <div
               style={{
                 display: "grid",
@@ -1003,44 +1003,15 @@ const PAYROLL_TABS = [
   { id: "entry", label: "勤怠入力" },
   { id: "list", label: "勤怠一覧" },
   { id: "agg", label: "集計" },
-  { id: "employees", label: "アルバイトマスタ" },
 ];
 
 function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab, onSelectHomeTab, showToast }) {
   const [tab, setTab] = useState(PAYROLL_TABS[0].id);
-  const [editingEmployee, setEditingEmployee] = useState(null); // null | {} | employee
-  const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
   const [editingShiftId, setEditingShiftId] = useState(null);
-  const isNarrow = useMediaQuery("(max-width: 720px)");
 
   const employees = payroll.employees;
   const shifts = payroll.shifts;
   const rankBonusRates = payroll.rankBonusRates;
-  const salesBackRates = payroll.salesBackRates;
-
-  const saveRankBonusRates = (rates) => {
-    onUpdatePayroll({ rankBonusRates: rates });
-    showToast("保存しました");
-  };
-
-  const saveSalesBackRates = (rates) => {
-    onUpdatePayroll({ salesBackRates: rates });
-    showToast("保存しました");
-  };
-
-  const saveEmployee = (emp) => {
-    const list = emp.id ? employees.map((e) => (e.id === emp.id ? emp : e)) : [...employees, { ...emp, id: uid("emp") }];
-    onUpdatePayroll({ employees: list });
-    setEditingEmployee(null);
-  };
-
-  const deleteEmployee = (id) => {
-    onUpdatePayroll({
-      employees: employees.filter((e) => e.id !== id),
-      shifts: shifts.filter((s) => s.employeeId !== id),
-    });
-    setDeletingEmployeeId(null);
-  };
 
   const saveShift = (shift) => {
     const isUpdate = !!shift.id;
@@ -1066,7 +1037,6 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
   };
 
   const editingShift = editingShiftId ? shifts.find((s) => s.id === editingShiftId) || null : null;
-  const deletingEmployee = deletingEmployeeId ? employees.find((e) => e.id === deletingEmployeeId) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -1085,28 +1055,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
         ))}
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: 20, maxWidth: (tab === "list" || tab === "agg" || tab === "employees") ? "none" : 640, margin: "0 auto", width: "100%" }}>
-        {tab === "employees" && (
-          <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 20 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <EmployeeListPanel
-                employees={employees}
-                onAdd={() => setEditingEmployee({})}
-                onEdit={(emp) => setEditingEmployee(emp)}
-                onDelete={(id) => setDeletingEmployeeId(id)}
-              />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {!isNarrow && (
-                <div style={{ visibility: "hidden", marginBottom: 16 }} aria-hidden="true">
-                  <TicketButton variant="primary" icon={Plus} style={{ pointerEvents: "none" }}>アルバイトを追加</TicketButton>
-                </div>
-              )}
-              <RankBonusSettingsPanel rankBonusRates={rankBonusRates} onSave={saveRankBonusRates} />
-              <SalesBackRateSettingsPanel salesBackRates={salesBackRates} onSave={saveSalesBackRates} />
-            </div>
-          </div>
-        )}
+      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: 20, maxWidth: (tab === "list" || tab === "agg") ? "none" : 640, margin: "0 auto", width: "100%" }}>
         {tab === "entry" && (
           <ShiftEntryPanel
             employees={employees}
@@ -1128,28 +1077,6 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
         )}
         {tab === "agg" && <AggregationPanel employees={employees} shifts={shifts} rankBonusRates={rankBonusRates} />}
       </div>
-
-      {editingEmployee !== null && (
-        <EmployeeEditModal
-          employee={editingEmployee}
-          onCancel={() => setEditingEmployee(null)}
-          onSave={saveEmployee}
-        />
-      )}
-
-      {deletingEmployee && (
-        <ConfirmModal
-          title="アルバイトを削除しますか？"
-          message={
-            shifts.some((s) => s.employeeId === deletingEmployee.id)
-              ? `${deletingEmployee.name} を削除すると、紐づく勤怠記録も削除されます。この操作は元に戻せません。`
-              : `${deletingEmployee.name} を削除します。よろしいですか？`
-          }
-          confirmLabel="削除する"
-          onCancel={() => setDeletingEmployeeId(null)}
-          onConfirm={() => deleteEmployee(deletingEmployee.id)}
-        />
-      )}
     </div>
   );
 }

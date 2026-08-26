@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/26 20:20";
+const APP_LAST_UPDATED = "2026/08/26 20:32";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -926,7 +926,7 @@ function GuestCountModal({ seatNum, employees, onConfirm, onCancel }) {
           <div style={{ marginBottom: 22 }}>
             {employees.length === 0 ? (
               <div style={{ fontSize: 12, color: COLORS.inkSoft, textAlign: "center" }}>
-                先に「アルバイトマスタ」でスタッフを登録してください。
+                先にマスタ設定の「アルバイトマスタ」でスタッフを登録してください。
               </div>
             ) : (
               <select
@@ -1869,9 +1869,6 @@ function UserGuidePanel() {
         <GuideItem label="集計">
           月次・年次で従業員ごとの給与を自動集計します(ランクによる時給アップ分・バックも反映されます)。
         </GuideItem>
-        <GuideItem label="アルバイトマスタ">
-          左側で従業員の氏名・時給を登録・編集・削除します。右側の「ランク別時給アップ額」では、勤怠入力の「呼込み/同伴/その他」を選んだ際に時給へ加算する金額(1時間あたり)を、全従業員共通で設定できます。その下の「売上バックの率」は入力欄のみで、現時点では給与計算には反映されません。
-        </GuideItem>
       </GuideSection>
 
       <GuideSection title="④ マスタ設定">
@@ -1883,6 +1880,9 @@ function UserGuidePanel() {
         </GuideItem>
         <GuideItem label="税・サービス料">
           サービス料率・消費税率を設定します。会計時は「小計→サービス料→消費税」の順で自動計算されます。
+        </GuideItem>
+        <GuideItem label="アルバイトマスタ">
+          左側で従業員の氏名・時給を登録・編集・削除します。右側の「ランク別時給アップ額」では、勤怠入力の「呼込み/同伴/その他」を選んだ際に時給へ加算する金額(1時間あたり)を、全従業員共通で設定できます。その下の「売上バックの率」は入力欄のみで、現時点では給与計算には反映されません。
         </GuideItem>
         <GuideItem label="パスワード設定">
           売上管理・アルバイト管理の2画面それぞれにパスワードを設定できます(売上履歴は売上管理内のタブのため、売上管理のパスワードが適用されます)。両方に設定する場合は「共通のパスワード」か「画面ごとに個別」かを選べます。「ロックのタイミング」では、アプリ起動中は初回のみ確認するか、画面を開くたび毎回確認するかを選べます。パスワードを忘れた場合は、この画面下部の「パスワードをリセット」から専用のキーワードを入力するとすべての設定を解除できます。このリセット用キーワード、および「パスワード設定」タブ自体を開くためのパスワードは、アプリ制作者に確認してください。
@@ -1916,10 +1916,12 @@ function UserGuidePanel() {
 /* ---------------------------------------------------------
    マスタ設定画面
 --------------------------------------------------------- */
-function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onUpdateSeatToneThresholds, onImportData, onImportDataPeriod, onDeleteAllData, onUpdateSecurity, onResetSecurity, showToast }) {
+function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onUpdateSeatName, onUpdateRates, onUpdateSeatToneThresholds, onUpdatePayroll, onImportData, onImportDataPeriod, onDeleteAllData, onUpdateSecurity, onResetSecurity, showToast }) {
   const isNarrow = useMediaQuery("(max-width: 720px)");
   const [tab, setTab] = useState("products");
   const [editing, setEditing] = useState(null); // product being edited, or {} for new
+  const [editingEmployee, setEditingEmployee] = useState(null); // null | {} | employee
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
   const [serviceInput, setServiceInput] = useState(String(data.serviceChargeRate ?? 0));
   const [taxInput, setTaxInput] = useState(String(data.taxRate ?? 0));
   const [warnInput, setWarnInput] = useState(String(data.seatToneThresholds?.warnMinutes ?? 30));
@@ -1952,6 +1954,31 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
       return;
     }
     setTab(id);
+  };
+
+  const saveEmployee = (emp) => {
+    const employees = data.payroll.employees;
+    const list = emp.id ? employees.map((e) => (e.id === emp.id ? emp : e)) : [...employees, { ...emp, id: uid("emp") }];
+    onUpdatePayroll({ employees: list });
+    setEditingEmployee(null);
+  };
+
+  const deleteEmployee = (id) => {
+    onUpdatePayroll({
+      employees: data.payroll.employees.filter((e) => e.id !== id),
+      shifts: data.payroll.shifts.filter((s) => s.employeeId !== id),
+    });
+    setDeletingEmployeeId(null);
+  };
+
+  const saveRankBonusRates = (rates) => {
+    onUpdatePayroll({ rankBonusRates: rates });
+    showToast("保存しました");
+  };
+
+  const saveSalesBackRates = (rates) => {
+    onUpdatePayroll({ salesBackRates: rates });
+    showToast("保存しました");
   };
 
   const exportData = () => {
@@ -2090,12 +2117,14 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
       });
   };
 
+  const deletingEmployee = deletingEmployeeId ? data.payroll.employees.find((e) => e.id === deletingEmployeeId) : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header title="マスタ設定" onBack={onBack} />
 
       <div style={{ display: "flex", gap: 6, padding: "12px 20px", borderBottom: `1px solid ${COLORS.line}`, background: COLORS.paper, overflowX: "auto" }}>
-        {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "password", label: "パスワード設定" }, { id: "data", label: "データ管理" }, { id: "help", label: "使用方法" }].map((t) => (
+        {[{ id: "products", label: "商品管理" }, { id: "seats", label: "座席設定" }, { id: "rates", label: "税・サービス料" }, { id: "staff", label: "アルバイトマスタ" }, { id: "password", label: "パスワード設定" }, { id: "data", label: "データ管理" }, { id: "help", label: "使用方法" }].map((t) => (
           <button
             key={t.id}
             onClick={() => handleTabClick(t.id)}
@@ -2144,7 +2173,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 20, maxWidth: tab === "seats" ? "none" : 560, margin: "0 auto", width: "100%" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: 20, maxWidth: (tab === "seats" || tab === "staff") ? "none" : 560, margin: "0 auto", width: "100%" }}>
         {tab === "products" && (
           <>
             <TicketButton variant="primary" onClick={() => setEditing({})} icon={Plus} style={{ marginBottom: 16 }}>
@@ -2367,6 +2396,28 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             </div>
 
             <TicketButton variant="primary" onClick={applyRates} style={{ width: "100%" }}>保存</TicketButton>
+          </div>
+        )}
+
+        {tab === "staff" && (
+          <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", gap: 20 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <EmployeeListPanel
+                employees={data.payroll.employees}
+                onAdd={() => setEditingEmployee({})}
+                onEdit={(emp) => setEditingEmployee(emp)}
+                onDelete={(id) => setDeletingEmployeeId(id)}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {!isNarrow && (
+                <div style={{ visibility: "hidden", marginBottom: 16 }} aria-hidden="true">
+                  <TicketButton variant="primary" icon={Plus} style={{ pointerEvents: "none" }}>アルバイトを追加</TicketButton>
+                </div>
+              )}
+              <RankBonusSettingsPanel rankBonusRates={data.payroll.rankBonusRates} onSave={saveRankBonusRates} />
+              <SalesBackRateSettingsPanel salesBackRates={data.payroll.salesBackRates} onSave={saveSalesBackRates} />
+            </div>
           </div>
         )}
 
@@ -2616,6 +2667,28 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
             onDeleteAllData();
             showToast("全データを削除しました");
           }}
+        />
+      )}
+
+      {editingEmployee !== null && (
+        <EmployeeEditModal
+          employee={editingEmployee}
+          onCancel={() => setEditingEmployee(null)}
+          onSave={saveEmployee}
+        />
+      )}
+
+      {deletingEmployee && (
+        <ConfirmModal
+          title="アルバイトを削除しますか？"
+          message={
+            data.payroll.shifts.some((s) => s.employeeId === deletingEmployee.id)
+              ? `${deletingEmployee.name} を削除すると、紐づく勤怠記録も削除されます。この操作は元に戻せません。`
+              : `${deletingEmployee.name} を削除します。よろしいですか？`
+          }
+          confirmLabel="削除する"
+          onCancel={() => setDeletingEmployeeId(null)}
+          onConfirm={() => deleteEmployee(deletingEmployee.id)}
         />
       )}
     </div>
@@ -3085,6 +3158,7 @@ function App() {
           onUpdateSeatToneThresholds={(warn, danger) =>
             persist({ ...dataRef.current, seatToneThresholds: { warnMinutes: warn, dangerMinutes: danger } })
           }
+          onUpdatePayroll={onUpdatePayroll}
           onImportData={(restored) => persist({ ...defaultData(), ...restored })}
           onImportDataPeriod={(restored, filtered) =>
             persist({
