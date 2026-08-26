@@ -338,6 +338,7 @@ function DailyShiftTable({ shifts, employees }) {
           <div>時間</div>
           <div>勤務時間</div>
           <div>時給</div>
+          <div>ランク</div>
           <div>日給</div>
           <div>オプション１</div>
           <div>オプション２</div>
@@ -346,7 +347,7 @@ function DailyShiftTable({ shifts, employees }) {
         </div>
         {shifts.map((shift) => {
           const emp = employees.find((e) => e.id === shift.employeeId);
-          const { hours, total } = payrollShiftTotal(shift, employees);
+          const { hours, total, wage } = payrollShiftTotal(shift, employees);
           return (
             <div
               key={shift.id}
@@ -367,7 +368,14 @@ function DailyShiftTable({ shifts, employees }) {
               </div>
               <div>{shift.startTime}-{shift.endTime}</div>
               <div>{formatHours(hours)}</div>
-              <div>{emp ? formatYen(emp.hourlyWage) : "-"}</div>
+              <div>{emp ? formatYen(wage) : "-"}</div>
+              <div>
+                {shift.rank ? (
+                  <span style={{ color: shift.rank === 2 ? COLORS.brick : COLORS.amber, fontWeight: 700 }}>
+                    {payrollRankLabel(shift.rank)}
+                  </span>
+                ) : "-"}
+              </div>
               <div>{shift.dailyWage > 0 ? formatYen(shift.dailyWage) : "-"}</div>
               <div>{shift.option > 0 ? formatYen(shift.option) : "-"}</div>
               <div>{shift.option2 > 0 ? formatYen(shift.option2) : "-"}</div>
@@ -461,17 +469,18 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
     `).join("");
 
   const shiftRowsHtml = shifts.length === 0
-    ? `<tr><td colspan="10" style="text-align:center;color:#5B6459">勤怠記録がまだありません。</td></tr>`
+    ? `<tr><td colspan="11" style="text-align:center;color:#5B6459">勤怠記録がまだありません。</td></tr>`
     : shifts.map((shift) => {
       const emp = employees.find((e) => e.id === shift.employeeId);
-      const { hours, total } = payrollShiftTotal(shift, employees);
+      const { hours, total, wage } = payrollShiftTotal(shift, employees);
       return `
         <tr>
           <td>${escapeHtml(shift.date)}</td>
           <td>${escapeHtml(emp ? emp.name : "(削除済み)")}</td>
           <td>${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)}</td>
           <td class="num">${escapeHtml(formatHours(hours))}</td>
-          <td class="num">${emp ? escapeHtml(formatYen(emp.hourlyWage)) : "-"}</td>
+          <td class="num">${emp ? escapeHtml(formatYen(wage)) : "-"}</td>
+          <td>${escapeHtml(payrollRankLabel(shift.rank))}</td>
           <td class="num">${shift.dailyWage > 0 ? escapeHtml(formatYen(shift.dailyWage)) : "-"}</td>
           <td class="num">${shift.option > 0 ? escapeHtml(formatYen(shift.option)) : "-"}</td>
           <td class="num">${shift.option2 > 0 ? escapeHtml(formatYen(shift.option2)) : "-"}</td>
@@ -514,7 +523,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   <h2>勤怠一覧</h2>
   <div class="sub">勤怠 ${shifts.length}件　合計 ${escapeHtml(formatYen(shiftsTotal))}</div>
   <table>
-    <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>日給</th><th>オプション1</th><th>オプション2</th><th>合計</th><th>メモ</th></tr></thead>
+    <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>ランク</th><th>日給</th><th>オプション1</th><th>オプション2</th><th>合計</th><th>メモ</th></tr></thead>
     <tbody>${shiftRowsHtml}</tbody>
   </table>
 </body></html>`;

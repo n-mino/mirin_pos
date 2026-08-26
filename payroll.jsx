@@ -43,14 +43,29 @@ function payrollShiftRangesOverlap(a, b) {
   return a.start < b.end && b.start < a.end;
 }
 
+// ランク(0=通常/1=呼び込み/2=同伴)に応じた時給。従業員にランク別時給が
+// 未設定(旧データ)の場合は通常時給にフォールバックする。
+const PAYROLL_RANK_LABELS = ["通常", "呼び込み", "同伴"];
+
+function payrollRankWage(emp, rank) {
+  if (!emp) return 0;
+  if (rank === 2) return emp.rankWage2 ?? emp.hourlyWage;
+  if (rank === 1) return emp.rankWage1 ?? emp.hourlyWage;
+  return emp.hourlyWage;
+}
+
+function payrollRankLabel(rank) {
+  return PAYROLL_RANK_LABELS[rank || 0] || PAYROLL_RANK_LABELS[0];
+}
+
 function payrollShiftTotal(shift, employees) {
   const emp = employees.find((e) => e.id === shift.employeeId);
-  const wage = emp ? emp.hourlyWage : 0;
+  const wage = payrollRankWage(emp, shift.rank || 0);
   const minutes = payrollShiftMinutes(shift.startTime, shift.endTime);
   const hours = minutes === null ? 0 : minutes / 60;
   const dailyWage = shift.dailyWage || 0;
   const base = dailyWage > 0 ? dailyWage : hours * wage;
-  return { hours, total: base + (shift.option || 0) + (shift.option2 || 0) };
+  return { hours, total: base + (shift.option || 0) + (shift.option2 || 0), wage };
 }
 
 function payrollPeriodKey(dateStr, period) {
@@ -180,7 +195,11 @@ function EmployeeListPanel({ employees, onAdd, onEdit, onDelete }) {
             >
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{emp.name}</div>
-                <div style={{ fontSize: 12, color: COLORS.inkSoft, fontFamily: MONO }}>時給 {formatYen(emp.hourlyWage)}</div>
+                <div style={{ fontSize: 12, color: COLORS.inkSoft, fontFamily: MONO }}>
+                  時給 {formatYen(emp.hourlyWage)}
+                  {emp.rankWage1 > emp.hourlyWage && ` ・呼び込み ${formatYen(emp.rankWage1)}`}
+                  {emp.rankWage2 > emp.hourlyWage && ` ・同伴 ${formatYen(emp.rankWage2)}`}
+                </div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => onEdit(emp)} style={payrollIconBtnStyle}>
@@ -201,11 +220,17 @@ function EmployeeListPanel({ employees, onAdd, onEdit, onDelete }) {
 function EmployeeEditModal({ employee, onCancel, onSave }) {
   const [name, setName] = useState(employee.name || "");
   const [wage, setWage] = useState(employee.hourlyWage != null ? String(employee.hourlyWage) : "");
+  const [rankWage1, setRankWage1] = useState(
+    employee.rankWage1 != null ? String(employee.rankWage1) : (employee.hourlyWage != null ? String(employee.hourlyWage) : "")
+  );
+  const [rankWage2, setRankWage2] = useState(
+    employee.rankWage2 != null ? String(employee.rankWage2) : (employee.hourlyWage != null ? String(employee.hourlyWage) : "")
+  );
 
-  const valid = name.trim().length > 0 && wage !== "" && Number(wage) >= 0;
+  const valid = name.trim().length > 0 && wage !== "" && Number(wage) >= 0 && rankWage1 !== "" && Number(rankWage1) >= 0 && rankWage2 !== "" && Number(rankWage2) >= 0;
 
   const handleSave = () => {
-    onSave({ ...employee, name: name.trim(), hourlyWage: Number(wage) });
+    onSave({ ...employee, name: name.trim(), hourlyWage: Number(wage), rankWage1: Number(rankWage1), rankWage2: Number(rankWage2) });
   };
 
   return (
@@ -233,6 +258,32 @@ function EmployeeEditModal({ employee, onCancel, onSave }) {
           style={{ ...payrollFieldInputStyle, marginBottom: 14, fontFamily: MONO }}
         />
 
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700, marginBottom: 4 }}>
+          ランク別時給(勤怠入力で条件を満たした日に適用)
+        </div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: COLORS.inkSoft }}>呼び込み(1UP)</label>
+            <input
+              type="number"
+              min="0"
+              value={rankWage1}
+              onChange={(e) => setRankWage1(e.target.value)}
+              style={{ ...payrollFieldInputStyle, fontFamily: MONO }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: COLORS.inkSoft }}>同伴(2UP)</label>
+            <input
+              type="number"
+              min="0"
+              value={rankWage2}
+              onChange={(e) => setRankWage2(e.target.value)}
+              style={{ ...payrollFieldInputStyle, fontFamily: MONO }}
+            />
+          </div>
+        </div>
+
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
           <TicketButton variant="ghost" onClick={onCancel} style={{ flex: 1 }}>キャンセル</TicketButton>
           <TicketButton variant="primary" disabled={!valid} onClick={handleSave} style={{ flex: 1 }}>保存</TicketButton>
@@ -251,6 +302,7 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
     date: toDateInputValue(new Date().toISOString()),
     startTime: "",
     endTime: "",
+    rank: 0,
     dailyWage: "0",
     option: "0",
     option2: "0",
@@ -262,6 +314,7 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
     date: s.date,
     startTime: s.startTime,
     endTime: s.endTime,
+    rank: s.rank || 0,
     dailyWage: String(s.dailyWage || 0),
     option: String(s.option || 0),
     option2: String(s.option2 || 0),
@@ -305,6 +358,7 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
       date: form.date,
       startTime: form.startTime,
       endTime: form.endTime,
+      rank: form.rank || 0,
       dailyWage: Math.max(0, Number(form.dailyWage) || 0),
       option: Math.max(0, Number(form.option) || 0),
       option2: Math.max(0, Number(form.option2) || 0),
@@ -347,6 +401,24 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 12, color: COLORS.inkSoft }}>終了時刻(15分単位)</label>
               <TimeStepSelect value={form.endTime} onChange={(v) => setField("endTime", v)} />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, color: COLORS.inkSoft }}>ランク(時給アップ条件)</label>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              {PAYROLL_RANK_LABELS.map((label, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setField("rank", idx)}
+                  style={{ ...payrollPillStyle(form.rank === idx), flex: 1, textAlign: "center" }}
+                >
+                  {idx === 0 ? label : `${label} +${idx}`}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>
+              複数該当する場合も、最も高いランクのみ適用されます
             </div>
           </div>
 
@@ -397,7 +469,7 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
 /* ---------------------------------------------------------
    勤怠一覧
 --------------------------------------------------------- */
-const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 80px 80px 80px 90px 140px 70px";
+const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 70px";
 
 function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
@@ -426,13 +498,13 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
   const totalAmount = list.reduce((sum, s) => sum + payrollShiftTotal(s, employees).total, 0);
 
   const exportShiftsCsv = () => {
-    const rows = [["日付", "従業員", "開始", "終了", "勤務時間", "時給", "日給", "オプション1", "オプション2", "合計", "メモ"]];
+    const rows = [["日付", "従業員", "開始", "終了", "勤務時間", "時給", "ランク", "日給", "オプション1", "オプション2", "合計", "メモ"]];
     list.forEach((shift) => {
       const emp = employees.find((e) => e.id === shift.employeeId);
-      const { hours, total } = payrollShiftTotal(shift, employees);
+      const { hours, total, wage } = payrollShiftTotal(shift, employees);
       rows.push([
         shift.date, emp ? emp.name : "(削除済み)", shift.startTime, shift.endTime, formatHours(hours),
-        emp ? emp.hourlyWage : 0, shift.dailyWage || 0, shift.option || 0, shift.option2 || 0, total,
+        wage, payrollRankLabel(shift.rank), shift.dailyWage || 0, shift.option || 0, shift.option2 || 0, total,
         shift.note || "",
       ]);
     });
@@ -520,7 +592,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 990 }}>
+          <div style={{ minWidth: 1080 }}>
             <div
               style={{
                 display: "grid",
@@ -538,6 +610,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
               <div>時間</div>
               <div>勤務時間</div>
               <div>時給</div>
+              <div>ランク</div>
               <div>日給</div>
               <div>オプション１</div>
               <div>オプション２</div>
@@ -547,7 +620,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
             </div>
             {list.map((shift) => {
               const emp = employees.find((e) => e.id === shift.employeeId);
-              const { hours, total } = payrollShiftTotal(shift, employees);
+              const { hours, total, wage } = payrollShiftTotal(shift, employees);
               return (
                 <div
                   key={shift.id}
@@ -568,7 +641,14 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
                   </div>
                   <div>{shift.startTime}-{shift.endTime}</div>
                   <div>{formatHours(hours)}</div>
-                  <div>{emp ? formatYen(emp.hourlyWage) : "-"}</div>
+                  <div>{emp ? formatYen(wage) : "-"}</div>
+                  <div>
+                    {shift.rank ? (
+                      <span style={{ color: shift.rank === 2 ? COLORS.brick : COLORS.amber, fontWeight: 700 }}>
+                        {payrollRankLabel(shift.rank)}
+                      </span>
+                    ) : "-"}
+                  </div>
                   <div>{shift.dailyWage > 0 ? formatYen(shift.dailyWage) : "-"}</div>
                   <div>{shift.option > 0 ? formatYen(shift.option) : "-"}</div>
                   <div>{shift.option2 > 0 ? formatYen(shift.option2) : "-"}</div>
