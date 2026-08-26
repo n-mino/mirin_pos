@@ -474,10 +474,9 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
                     onClick={() => {
                       const next = active ? "" : opt.key;
                       setField("rankKey", next);
-                      // 同伴を選んだ際、同伴バックによく使われる金額を自動入力しておく(手入力の手間を減らす目的。手動で変更可能)
-                      if (opt.key === "companion" && next === "companion") {
-                        setField("option", "3000");
-                      }
+                      // 同伴を選んだ際、同伴バックによく使われる金額を自動入力しておく(手入力の手間を減らす目的。手動で変更可能)。
+                      // 同伴以外を選んだ場合(解除して通常に戻す場合も含む)は自動入力した金額をクリアする。
+                      setField("option", next === "companion" ? "3000" : "0");
                     }}
                     style={{ ...payrollPillStyle(active), flex: 1, textAlign: "center" }}
                   >
@@ -538,9 +537,9 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
 /* ---------------------------------------------------------
    勤怠一覧
 --------------------------------------------------------- */
-const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 70px";
+const SHIFT_TABLE_COLS = "90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 100px 70px";
 
-function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete }) {
+function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, onTogglePaid }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(employees[0]?.id || "");
   const [dateMode, setDateMode] = useState("today"); // today | all | date
@@ -567,14 +566,14 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete })
   const totalAmount = list.reduce((sum, s) => sum + payrollShiftTotal(s, employees, rankBonusRates).total, 0);
 
   const exportShiftsCsv = () => {
-    const rows = [["日付", "従業員", "開始", "終了", "勤務時間", "時給", "ランク", "日給", "同伴バック", "売上バック", "合計", "メモ"]];
+    const rows = [["日付", "従業員", "開始", "終了", "勤務時間", "時給", "ランク", "日給", "同伴バック", "売上バック", "合計", "メモ", "支払日"]];
     list.forEach((shift) => {
       const emp = employees.find((e) => e.id === shift.employeeId);
       const { hours, total, wage } = payrollShiftTotal(shift, employees, rankBonusRates);
       rows.push([
         shift.date, emp ? emp.name : "(削除済み)", shift.startTime, shift.endTime, formatHours(hours),
         wage, payrollRankLabel(shift.rankKey), shift.dailyWage || 0, shift.option || 0, shift.option2 || 0, total,
-        shift.note || "",
+        shift.note || "", shift.paidDate || "",
       ]);
     });
     const empSuffix = viewMode === "individual" ? (employees.find((e) => e.id === selectedEmployeeId)?.name || "individual") : "all";
@@ -661,7 +660,7 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete })
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 1080 }}>
+          <div style={{ minWidth: 1180 }}>
             <div
               style={{
                 display: "grid",
@@ -685,6 +684,7 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete })
               <div>売上バック</div>
               <div>合計</div>
               <div>メモ</div>
+              <div>支払日</div>
               <div>操作</div>
             </div>
             {list.map((shift) => {
@@ -725,7 +725,24 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete })
                   <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {shift.note || ""}
                   </div>
+                  <div style={{ fontFamily: SANS, color: shift.paidDate ? COLORS.sage : COLORS.inkSoft, fontWeight: shift.paidDate ? 700 : 400 }}>
+                    {shift.paidDate || "-"}
+                  </div>
                   <div style={{ display: "flex", gap: 4 }}>
+                    <button
+                      onClick={() => onTogglePaid(shift.id)}
+                      title={shift.paidDate ? "支払い済みを解除" : "支払い済みにする"}
+                      style={{
+                        ...payrollIconBtnStyle,
+                        width: 26,
+                        height: 26,
+                        background: shift.paidDate ? COLORS.sage : "transparent",
+                        border: `1px solid ${shift.paidDate ? COLORS.sage : COLORS.line}`,
+                        color: shift.paidDate ? COLORS.paper : COLORS.inkSoft,
+                      }}
+                    >
+                      <Banknote size={12} />
+                    </button>
                     <button onClick={() => onEdit(shift.id)} style={{ ...payrollIconBtnStyle, width: 26, height: 26 }}>
                       <Pencil size={12} />
                     </button>
@@ -1035,6 +1052,17 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
     onUpdatePayroll({ shifts: shifts.filter((s) => s.id !== id) });
   };
 
+  const togglePaidDate = (id) => {
+    let nowPaid = false;
+    const list = shifts.map((s) => {
+      if (s.id !== id) return s;
+      nowPaid = !s.paidDate;
+      return { ...s, paidDate: s.paidDate ? "" : toDateInputValue(new Date().toISOString()).replaceAll("-", "/") };
+    });
+    onUpdatePayroll({ shifts: list });
+    showToast(nowPaid ? "支払い済みにしました" : "支払い未定に戻しました");
+  };
+
   const editingShift = editingShiftId ? shifts.find((s) => s.id === editingShiftId) || null : null;
   const deletingEmployee = deletingEmployeeId ? employees.find((e) => e.id === deletingEmployeeId) : null;
 
@@ -1093,6 +1121,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
             rankBonusRates={rankBonusRates}
             onEdit={(id) => { setEditingShiftId(id); setTab("entry"); }}
             onDelete={deleteShift}
+            onTogglePaid={togglePaidDate}
           />
         )}
         {tab === "agg" && <AggregationPanel employees={employees} shifts={shifts} rankBonusRates={rankBonusRates} />}

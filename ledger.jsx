@@ -320,7 +320,7 @@ function DailyShiftTable({ shifts, employees, rankBonusRates }) {
   const dailyShiftTableCols = SHIFT_TABLE_COLS.split(" ").slice(0, -1).join(" ");
   return (
     <div style={{ overflowX: "auto" }}>
-      <div style={{ minWidth: 920 }}>
+      <div style={{ minWidth: 1020 }}>
         <div
           style={{
             display: "grid",
@@ -344,6 +344,7 @@ function DailyShiftTable({ shifts, employees, rankBonusRates }) {
           <div>売上バック</div>
           <div>合計</div>
           <div>メモ</div>
+          <div>支払日</div>
         </div>
         {shifts.map((shift) => {
           const emp = employees.find((e) => e.id === shift.employeeId);
@@ -382,6 +383,9 @@ function DailyShiftTable({ shifts, employees, rankBonusRates }) {
               <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(total)}</div>
               <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {shift.note || ""}
+              </div>
+              <div style={{ fontFamily: SANS, color: shift.paidDate ? COLORS.sage : COLORS.inkSoft, fontWeight: shift.paidDate ? 700 : 400 }}>
+                {shift.paidDate || "-"}
               </div>
             </div>
           );
@@ -469,7 +473,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
     `).join("");
 
   const shiftRowsHtml = shifts.length === 0
-    ? `<tr><td colspan="11" style="text-align:center;color:#5B6459">勤怠記録がまだありません。</td></tr>`
+    ? `<tr><td colspan="12" style="text-align:center;color:#5B6459">勤怠記録がまだありません。</td></tr>`
     : shifts.map((shift) => {
       const emp = employees.find((e) => e.id === shift.employeeId);
       const { hours, total, wage } = payrollShiftTotal(shift, employees, rankBonusRates);
@@ -486,6 +490,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
           <td class="num">${shift.option2 > 0 ? escapeHtml(formatYen(shift.option2)) : "-"}</td>
           <td class="num">${escapeHtml(formatYen(total))}</td>
           <td>${escapeHtml(shift.note || "")}</td>
+          <td>${escapeHtml(shift.paidDate || "-")}</td>
         </tr>
       `;
     }).join("");
@@ -523,7 +528,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   <h2>勤怠一覧</h2>
   <div class="sub">勤怠 ${shifts.length}件　合計 ${escapeHtml(formatYen(shiftsTotal))}</div>
   <table>
-    <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>ランク</th><th>日給</th><th>同伴バック</th><th>売上バック</th><th>合計</th><th>メモ</th></tr></thead>
+    <thead><tr><th>日付</th><th>従業員</th><th>時間</th><th>勤務時間</th><th>時給</th><th>ランク</th><th>日給</th><th>同伴バック</th><th>売上バック</th><th>合計</th><th>メモ</th><th>支払日</th></tr></thead>
     <tbody>${shiftRowsHtml}</tbody>
   </table>
 </body></html>`;
