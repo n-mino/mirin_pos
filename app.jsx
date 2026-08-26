@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/26 19:44";
+const APP_LAST_UPDATED = "2026/08/26 19:58";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -769,12 +769,12 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                     {seatDisplayLabel(n, seatName)}
                   </span>
                   {occupied && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       <span style={{ fontSize: 12, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
                         ● 使用中
                       </span>
                       {companionLabel(seat.companion) && (
-                        <>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                           <span
                             style={{
                               fontSize: 12,
@@ -791,7 +791,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                           <span style={{ fontSize: 12, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
                             ({companionKindLabel(companionEffectiveKind(seat.companion, seat.companionKind))})
                           </span>
-                        </>
+                        </div>
                       )}
                     </div>
                   )}
