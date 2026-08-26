@@ -59,6 +59,9 @@ function payrollRankBonus(rankBonusRates, rankKey) {
   return rates[rankKey] ?? PAYROLL_DEFAULT_RANK_BONUS_RATES[rankKey] ?? 0;
 }
 
+// 売上バックの率(%)。現時点では入力欄の用意のみで、計算には使用しない(ユーザー指示による)。
+const PAYROLL_DEFAULT_SALES_BACK_RATES = { over30k: 10, group5over50k: 30, bottle: 10 };
+
 function payrollRankLabel(rankKey) {
   return PAYROLL_RANK_OPTIONS.find((o) => o.key === rankKey)?.label || "";
 }
@@ -293,17 +296,55 @@ function RankBonusSettingsPanel({ rankBonusRates, onSave }) {
         勤怠入力でランクを選ぶと、時給に1時間あたりこの金額が加算されます。全従業員共通の設定です。
       </div>
 
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>呼込み(円/時)</label>
-        <input type="number" min="0" value={call} onChange={(e) => setCall(e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, width: 100, flexShrink: 0 }}>呼込み(円/時)</label>
+        <input type="number" min="0" value={call} onChange={(e) => setCall(e.target.value)} style={{ ...payrollFieldInputStyle, marginTop: 0, fontFamily: MONO }} />
       </div>
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>同伴(円/時)</label>
-        <input type="number" min="0" value={companion} onChange={(e) => setCompanion(e.target.value)} style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, width: 100, flexShrink: 0 }}>同伴(円/時)</label>
+        <input type="number" min="0" value={companion} onChange={(e) => setCompanion(e.target.value)} style={{ ...payrollFieldInputStyle, marginTop: 0, fontFamily: MONO }} />
       </div>
-      <div style={{ marginBottom: 18 }}>
-        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>その他(円/時)</label>
-        <input type="number" min="0" value={other} onChange={(e) => setOther(e.target.value)} placeholder="任意" style={{ ...payrollFieldInputStyle, fontFamily: MONO }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, width: 100, flexShrink: 0 }}>その他(円/時)</label>
+        <input type="number" min="0" value={other} onChange={(e) => setOther(e.target.value)} placeholder="任意" style={{ ...payrollFieldInputStyle, marginTop: 0, fontFamily: MONO }} />
+      </div>
+
+      <TicketButton variant="primary" onClick={handleSave} style={{ width: "100%" }}>保存</TicketButton>
+    </div>
+  );
+}
+
+// アルバイトマスタ右側、ランク別時給アップ額の下に配置する「売上バックの率」設定。
+// 現時点では入力欄の用意のみで、実際の計算(集計・給与への反映)には使用しない(ユーザー指示による)。
+function SalesBackRateSettingsPanel({ salesBackRates, onSave }) {
+  const initial = (key) => String(salesBackRates?.[key] ?? PAYROLL_DEFAULT_SALES_BACK_RATES[key]);
+  const [over30k, setOver30k] = useState(initial("over30k"));
+  const [group5over50k, setGroup5over50k] = useState(initial("group5over50k"));
+  const [bottle, setBottle] = useState(initial("bottle"));
+
+  const handleSave = () => {
+    onSave({
+      over30k: Math.max(0, Number(over30k) || 0),
+      group5over50k: Math.max(0, Number(group5over50k) || 0),
+      bottle: Math.max(0, Number(bottle) || 0),
+    });
+  };
+
+  return (
+    <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20, marginTop: 20 }}>
+      <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 18 }}>売上バックの率(%)</div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, width: 160, flexShrink: 0 }}>小計30,000超</label>
+        <input type="number" min="0" value={over30k} onChange={(e) => setOver30k(e.target.value)} style={{ ...payrollFieldInputStyle, marginTop: 0, fontFamily: MONO }} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, width: 160, flexShrink: 0 }}>5人以上+小計50,000超</label>
+        <input type="number" min="0" value={group5over50k} onChange={(e) => setGroup5over50k(e.target.value)} style={{ ...payrollFieldInputStyle, marginTop: 0, fontFamily: MONO }} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, width: 160, flexShrink: 0 }}>ボトル関連</label>
+        <input type="number" min="0" value={bottle} onChange={(e) => setBottle(e.target.value)} style={{ ...payrollFieldInputStyle, marginTop: 0, fontFamily: MONO }} />
       </div>
 
       <TicketButton variant="primary" onClick={handleSave} style={{ width: "100%" }}>保存</TicketButton>
@@ -314,7 +355,7 @@ function RankBonusSettingsPanel({ rankBonusRates, onSave }) {
 /* ---------------------------------------------------------
    勤怠入力
 --------------------------------------------------------- */
-function ShiftEntryPanel({ employees, shifts, editingShift, rankBonusRates, onSave, onCancelEdit }) {
+function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit }) {
   const blank = () => ({
     employeeId: employees[0]?.id || "",
     date: toDateInputValue(new Date().toISOString()),
@@ -427,14 +468,20 @@ function ShiftEntryPanel({ employees, shifts, editingShift, rankBonusRates, onSa
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               {PAYROLL_RANK_OPTIONS.map((opt) => {
                 const active = form.rankKey === opt.key;
-                const amount = payrollRankBonus(rankBonusRates, opt.key);
                 return (
                   <button
                     key={opt.key}
-                    onClick={() => setField("rankKey", active ? "" : opt.key)}
+                    onClick={() => {
+                      const next = active ? "" : opt.key;
+                      setField("rankKey", next);
+                      // 同伴を選んだ際、同伴バックによく使われる金額を自動入力しておく(手入力の手間を減らす目的。手動で変更可能)
+                      if (opt.key === "companion" && next === "companion") {
+                        setField("option", "3000");
+                      }
+                    }}
                     style={{ ...payrollPillStyle(active), flex: 1, textAlign: "center" }}
                   >
-                    {opt.label}{amount > 0 ? ` +${formatYen(amount)}` : ""}
+                    {opt.label}
                   </button>
                 );
               })}
@@ -950,9 +997,15 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
   const employees = payroll.employees;
   const shifts = payroll.shifts;
   const rankBonusRates = payroll.rankBonusRates;
+  const salesBackRates = payroll.salesBackRates;
 
   const saveRankBonusRates = (rates) => {
     onUpdatePayroll({ rankBonusRates: rates });
+    showToast("保存しました");
+  };
+
+  const saveSalesBackRates = (rates) => {
+    onUpdatePayroll({ salesBackRates: rates });
     showToast("保存しました");
   };
 
@@ -1020,6 +1073,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
                 </div>
               )}
               <RankBonusSettingsPanel rankBonusRates={rankBonusRates} onSave={saveRankBonusRates} />
+              <SalesBackRateSettingsPanel salesBackRates={salesBackRates} onSave={saveSalesBackRates} />
             </div>
           </div>
         )}
@@ -1028,7 +1082,6 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
             employees={employees}
             shifts={shifts}
             editingShift={editingShift}
-            rankBonusRates={rankBonusRates}
             onSave={saveShift}
             onCancelEdit={() => { setEditingShiftId(null); setTab("list"); }}
           />
