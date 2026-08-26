@@ -243,7 +243,7 @@ function DailySalesTable({ sales }) {
   }
   return (
     <div style={{ overflowX: "auto" }}>
-      <div style={{ minWidth: 1290 }}>
+      <div style={{ minWidth: 1320 }}>
         <div
           style={{
             display: "grid",
@@ -289,7 +289,7 @@ function DailySalesTable({ sales }) {
               {seatDisplayLabel(s.seatId, s.seatName)}
             </div>
             <div>{s.guests}名</div>
-            <div>{s.companion ? "○" : ""}</div>
+            <div>{companionLabel(s.companion)}</div>
             <div>{formatYen(s.subtotal)}</div>
             <div>{formatYen(s.serviceCharge)}</div>
             <div>{formatYen(s.tax)}</div>
@@ -447,7 +447,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
         <td>${escapeHtml(formatDateTimeRange(s.startTime, s.endTime))}</td>
         <td>${escapeHtml(seatDisplayLabel(s.seatId, s.seatName))}</td>
         <td class="num">${s.guests}名</td>
-        <td class="num">${s.companion ? "○" : ""}</td>
+        <td class="num">${escapeHtml(companionLabel(s.companion))}</td>
         <td class="num">${escapeHtml(formatYen(s.subtotal))}</td>
         <td class="num">${escapeHtml(formatYen(s.serviceCharge))}</td>
         <td class="num">${escapeHtml(formatYen(s.tax))}</td>
@@ -981,7 +981,7 @@ function AggregationGraphPanel({ data }) {
 /* ---------------------------------------------------------
    売上履歴パネル(売上管理内のサブタブ)
 --------------------------------------------------------- */
-const HISTORY_TABLE_COLS = "170px 110px 60px 60px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
+const HISTORY_TABLE_COLS = "170px 110px 60px 90px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
 
 function SalesHistoryPanel({ salesHistory, onSelectSale }) {
   const [mode, setMode] = useState("today"); // today | all | date
@@ -1067,7 +1067,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
       )}
       {filtered.length > 0 && (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 1290 }}>
+          <div style={{ minWidth: 1320 }}>
             <div
               style={{
                 display: "grid",
@@ -1122,7 +1122,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
                   {seatDisplayLabel(s.seatId, s.seatName)}
                 </div>
                 <div>{s.guests}名</div>
-                <div>{s.companion ? "○" : ""}</div>
+                <div>{companionLabel(s.companion)}</div>
                 <div>{formatYen(s.subtotal)}</div>
                 <div>{formatYen(s.serviceCharge)}</div>
                 <div>{formatYen(s.tax)}</div>
