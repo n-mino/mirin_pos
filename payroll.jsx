@@ -80,7 +80,9 @@ function payrollShiftTotal(shift, employees, rankBonusRates) {
   const hours = minutes === null ? 0 : minutes / 60;
   const dailyWage = shift.dailyWage || 0;
   const base = dailyWage > 0 ? dailyWage : hours * wage;
-  return { hours, total: base + (shift.option || 0) + (shift.option2 || 0), wage };
+  // 同伴バック(option)と売上バック(option2)は両方に値があっても加算せず、大きい方のみを採用する
+  const back = Math.max(shift.option || 0, shift.option2 || 0);
+  return { hours, total: base + back, wage };
 }
 
 function payrollPeriodKey(dateStr, period) {

@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/26 19:11";
+const APP_LAST_UPDATED = "2026/08/26 19:44";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -283,10 +283,22 @@ function seatDisplayLabel(n, seatName) {
   return seatName || `座席 ${n}`;
 }
 
-// companionは同伴時に選択したアルバイトの名前(文字列)。過去データの真偽値(companion:true)は
+// companionは同伴/呼込み時に選択したアルバイトの名前(文字列)。過去データの真偽値(companion:true)は
 // 名前情報を持たないため空扱いにする。
 function companionLabel(companion) {
   return typeof companion === "string" ? companion : "";
+}
+
+// companionKindは"call"(呼込み)|"companion"(同伴)|""(なし)。名前が入っているのにkindが
+// 未設定(同伴/呼込みの区別を導入する前の過去データ)の場合は、当時は同伴しか無かったため
+// "companion"にフォールバックする。
+function companionEffectiveKind(companion, companionKind) {
+  if (!companionLabel(companion)) return "";
+  return companionKind === "call" ? "call" : "companion";
+}
+
+function companionKindLabel(kind) {
+  return kind === "call" ? "呼込" : kind === "companion" ? "同伴" : "";
 }
 
 function formatElapsed(startIso, nowMs) {
@@ -462,10 +474,13 @@ function csvTimestamp() {
 
 // 売上履歴(売上管理内の売上履歴タブ・マスタ設定の全件書き出し双方で使う行データ)
 function salesHistoryToCsvRows(salesHistory) {
-  const rows = [["会計ID", "日時", "座席", "人数", "同伴", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
+  const rows = [["会計ID", "日時", "座席", "人数", "呼込み", "同伴", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
   (salesHistory || []).forEach((s) => {
+    const kind = companionEffectiveKind(s.companion, s.companionKind);
     rows.push([
-      s.id, s.endTime, seatDisplayLabel(s.seatId, s.seatName), s.guests, companionLabel(s.companion), s.subtotal, s.serviceCharge, s.tax, s.total,
+      s.id, s.endTime, seatDisplayLabel(s.seatId, s.seatName), s.guests,
+      kind === "call" ? companionLabel(s.companion) : "", kind === "companion" ? companionLabel(s.companion) : "",
+      s.subtotal, s.serviceCharge, s.tax, s.total,
       s.payments?.cash || 0, s.payments?.card || 0, s.payments?.paypay || 0, s.payments?.onAccount || 0,
       s.memo || "",
     ]);
@@ -759,19 +774,24 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                         ● 使用中
                       </span>
                       {companionLabel(seat.companion) && (
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontFamily: MONO,
-                            fontWeight: 700,
-                            color: COLORS.paper,
-                            background: tone.fg,
-                            borderRadius: 10,
-                            padding: "1px 8px",
-                          }}
-                        >
-                          {companionLabel(seat.companion)}
-                        </span>
+                        <>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontFamily: MONO,
+                              fontWeight: 700,
+                              color: COLORS.paper,
+                              background: tone.fg,
+                              borderRadius: 10,
+                              padding: "1px 8px",
+                            }}
+                          >
+                            {companionLabel(seat.companion)}
+                          </span>
+                          <span style={{ fontSize: 12, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
+                            ({companionKindLabel(companionEffectiveKind(seat.companion, seat.companionKind))})
+                          </span>
+                        </>
                       )}
                     </div>
                   )}
@@ -804,17 +824,20 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
 --------------------------------------------------------- */
 function GuestCountModal({ seatNum, employees, onConfirm, onCancel }) {
   const [count, setCount] = useState(2);
-  const [companionOn, setCompanionOn] = useState(false);
+  const [companionKind, setCompanionKind] = useState(""); // "" | "call" | "companion"
   const [companionName, setCompanionName] = useState("");
   const quick = [1, 2, 3, 4, 5, 6, 8];
 
   useEffect(() => {
-    if (!companionOn) {
+    if (!companionKind) {
       setCompanionName("");
     } else if (!companionName && employees.length > 0) {
       setCompanionName(employees[0].name);
     }
-  }, [companionOn, employees]);
+  }, [companionKind, employees]);
+
+  // 同伴/呼込みはどちらか一方のみ選択可能(同じ方をもう一度押すと解除、もう片方を押すと切り替え)
+  const toggleKind = (kind) => setCompanionKind((cur) => (cur === kind ? "" : kind));
 
   return (
     <div
@@ -888,12 +911,18 @@ function GuestCountModal({ seatNum, employees, onConfirm, onCancel }) {
           </button>
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: companionOn ? 10 : 22, cursor: "pointer" }}>
-          <input type="checkbox" checked={companionOn} onChange={(e) => setCompanionOn(e.target.checked)} style={{ width: 16, height: 16 }} />
-          <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>同伴</span>
-        </label>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, marginBottom: companionKind ? 10 : 22 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={companionKind === "call"} onChange={() => toggleKind("call")} style={{ width: 16, height: 16 }} />
+            <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>呼込み</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={companionKind === "companion"} onChange={() => toggleKind("companion")} style={{ width: 16, height: 16 }} />
+            <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>同伴</span>
+          </label>
+        </div>
 
-        {companionOn && (
+        {companionKind && (
           <div style={{ marginBottom: 22 }}>
             {employees.length === 0 ? (
               <div style={{ fontSize: 12, color: COLORS.inkSoft, textAlign: "center" }}>
@@ -924,7 +953,7 @@ function GuestCountModal({ seatNum, employees, onConfirm, onCancel }) {
 
         <div style={{ display: "flex", gap: 10 }}>
           <TicketButton variant="ghost" onClick={onCancel} style={{ flex: 1 }}>キャンセル</TicketButton>
-          <TicketButton variant="primary" onClick={() => onConfirm(count, companionOn ? companionName : "")} style={{ flex: 1 }}>開始する</TicketButton>
+          <TicketButton variant="primary" onClick={() => onConfirm(count, companionKind, companionKind ? companionName : "")} style={{ flex: 1 }}>開始する</TicketButton>
         </div>
       </div>
     </div>
@@ -1130,7 +1159,7 @@ function OrderScreen({ seatNum, seatName, seat, products, now, onUpdateOrders, o
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Header
-        title={companionLabel(seat.companion) ? `${seatDisplayLabel(seatNum, seatName)}　　担当：${companionLabel(seat.companion)}` : seatDisplayLabel(seatNum, seatName)}
+        title={companionLabel(seat.companion) ? `${seatDisplayLabel(seatNum, seatName)}　　${companionKindLabel(companionEffectiveKind(seat.companion, seat.companionKind))}：${companionLabel(seat.companion)}` : seatDisplayLabel(seatNum, seatName)}
         onBack={onBack}
         right={
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: MONO, fontSize: 13 }}>
@@ -1801,8 +1830,8 @@ function UserGuidePanel() {
         <GuideItem label="会計の流れ">
           座席カードをタップ→人数を選択(同伴のお客様の場合は「同伴」にチェック)して「開始する」→商品をタップして注文を追加→「会計へ進む」→お支払い方法(現金・カード・PayPay・売掛)を入力し「会計を確定して座席を空ける」で完了します。
         </GuideItem>
-        <GuideItem label="同伴">
-          人数入力時に「同伴」をチェックすると、担当するアルバイトを選択するリストが表示されます。選択すると座席カードに「使用中(担当者名)」、注文画面の見出しに「座席名　担当：担当者名」と表示され、会計後は売上履歴・日次集計の「同伴」列に担当者名が記録されます。
+        <GuideItem label="同伴・呼込み">
+          人数入力時に「呼込み」または「同伴」をチェックすると(どちらか一方のみ選択できます)、担当するアルバイトを選択するリストが表示されます。選択すると座席カードに「使用中[担当者名](呼込または同伴)」、注文画面の見出しに「座席名　呼込または同伴：担当者名」と表示され、会計後は売上履歴・日次集計の「呼込み」または「同伴」列に担当者名が記録されます。
         </GuideItem>
         <GuideItem label="座席カードの色分け">
           使用中の座席カードは経過時間に応じて緑→黄→赤の順に色が変わります。切り替わりまでの時間はマスタ設定の「座席設定」で変更できます(初期値: 黄30分・赤60分)。
@@ -2926,9 +2955,18 @@ function App() {
     }
   };
 
-  const handleConfirmGuests = (count, companion) => {
+  const handleConfirmGuests = (count, companionKind, companion) => {
     const n = guestModalSeat;
-    const newSeats = { ...dataRef.current.seats, [n]: { guests: count, companion: companion || "", startTime: new Date().toISOString(), orders: [] } };
+    const newSeats = {
+      ...dataRef.current.seats,
+      [n]: {
+        guests: count,
+        companion: companion || "",
+        companionKind: companion ? companionKind : "",
+        startTime: new Date().toISOString(),
+        orders: [],
+      },
+    };
     persist({ ...dataRef.current, seats: newSeats });
     setGuestModalSeat(null);
     setActiveSeat(n);
@@ -2960,6 +2998,7 @@ function App() {
       seatName: dataRef.current.seatNames?.[n] || "",
       guests: seat.guests,
       companion: companionLabel(seat.companion),
+      companionKind: companionEffectiveKind(seat.companion, seat.companionKind),
       startTime: seat.startTime,
       endTime: new Date().toISOString(),
       orders: seat.orders,
