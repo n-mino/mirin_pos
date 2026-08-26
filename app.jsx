@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/26 15:21";
+const APP_LAST_UPDATED = "2026/08/26 16:03";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -678,7 +678,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
           gap: 20,
           alignItems: "center",
           fontFamily: MONO,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: 700,
           color: COLORS.inkSoft,
           borderBottom: `1px dashed ${COLORS.line}`,
@@ -693,7 +693,7 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(147px, 1fr))",
             gap: 14,
           }}
         >
@@ -749,14 +749,31 @@ function TopScreen({ data, now, onSelectSeat, onOpenSettings, activeHomeTab, onS
                     {seatDisplayLabel(n, seatName)}
                   </span>
                   {occupied && (
-                    <span style={{ fontSize: 11, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
-                      ● 使用中{companionLabel(seat.companion) ? `(${companionLabel(seat.companion)})` : ""}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, fontFamily: MONO, color: tone.fg, fontWeight: 700 }}>
+                        ● 使用中
+                      </span>
+                      {companionLabel(seat.companion) && (
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontFamily: MONO,
+                            fontWeight: 700,
+                            color: COLORS.paper,
+                            background: tone.fg,
+                            borderRadius: 10,
+                            padding: "1px 8px",
+                          }}
+                        >
+                          {companionLabel(seat.companion)}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 {occupied ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: COLORS.inkSoft }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: COLORS.inkSoft }}>
                       <Users size={12} /> {seat.guests}名
                       <Clock size={12} style={{ marginLeft: 6 }} />
                       <span style={{ fontFamily: MONO }}>{formatElapsed(seat.startTime, now)}</span>
@@ -1111,7 +1128,7 @@ function OrderScreen({ seatNum, seatName, seat, products, now, onUpdateOrders, o
         title={companionLabel(seat.companion) ? `${seatDisplayLabel(seatNum, seatName)}　　担当：${companionLabel(seat.companion)}` : seatDisplayLabel(seatNum, seatName)}
         onBack={onBack}
         right={
-          <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: MONO, fontSize: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: MONO, fontSize: 13 }}>
             <Users size={14} /> {seat.guests}名
             <Clock size={14} style={{ marginLeft: 4 }} /> {formatElapsed(seat.startTime, now)}
           </div>
@@ -1310,7 +1327,7 @@ function CheckoutScreen({ seatNum, seat, data, now, onBack, onConfirm }) {
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: COLORS.inkSoft, fontFamily: MONO, marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: COLORS.inkSoft, fontFamily: MONO, marginBottom: 10 }}>
             <span>{seat.guests}名 ・ 滞在 {formatElapsed(seat.startTime, now)}</span>
           </div>
           {seat.orders.map((o) => (
@@ -2684,7 +2701,7 @@ function HistoryDetailScreen({ sale, onBack }) {
 
       <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 18 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: COLORS.inkSoft, fontFamily: MONO, marginBottom: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, color: COLORS.inkSoft, fontFamily: MONO, marginBottom: 10 }}>
             <span>{sale.guests}名</span>
             <span>入店 {formatDateTimeShort(sale.startTime)} 〜 会計 {formatDateTimeShort(sale.endTime)}</span>
           </div>

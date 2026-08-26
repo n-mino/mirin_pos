@@ -505,7 +505,7 @@ function ShiftListPanel({ employees, shifts, onEdit, onDelete }) {
           display: "flex",
           gap: 20,
           fontFamily: MONO,
-          fontSize: 12,
+          fontSize: 13,
           color: COLORS.inkSoft,
           marginBottom: 12,
         }}

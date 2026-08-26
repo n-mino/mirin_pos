@@ -653,7 +653,7 @@ function DailySummaryPanel({ data }) {
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>売上履歴</div>
-        <div style={{ display: "flex", gap: 20, fontFamily: MONO, fontSize: 12, color: COLORS.inkSoft, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 20, fontFamily: MONO, fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 }}>
           <span>会計 {sales.length}件</span>
           <span>合計 {formatYen(salesTotal)}</span>
         </div>
@@ -662,7 +662,7 @@ function DailySummaryPanel({ data }) {
 
       <div>
         <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>勤怠一覧</div>
-        <div style={{ display: "flex", gap: 20, fontFamily: MONO, fontSize: 12, color: COLORS.inkSoft, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 20, fontFamily: MONO, fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 }}>
           <span>勤怠 {shifts.length}件</span>
           <span>合計 {formatYen(laborCost)}</span>
         </div>
@@ -1051,7 +1051,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
           display: "flex",
           gap: 20,
           fontFamily: MONO,
-          fontSize: 12,
+          fontSize: 13,
           color: COLORS.inkSoft,
           marginBottom: 12,
         }}
