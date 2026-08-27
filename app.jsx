@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/27 16:31";
+const APP_LAST_UPDATED = "2026/08/27 17:06";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -308,7 +308,12 @@ function computeSalesBackAmount(subtotal, guests, salesBackRates) {
   const rates = salesBackRates || {};
   const condGroup = guests >= 5 && subtotal > 50000;
   const condOver30k = subtotal > 30000;
-  const rate = condGroup ? (rates.group5over50k || 0) : condOver30k ? (rates.over30k || 0) : 0;
+  const key = condGroup ? "group5over50k" : condOver30k ? "over30k" : null;
+  if (!key) return 0;
+  // 既存端末のlocalStorageはpayrollオブジェクトを丸ごと上書きする浅いマージのため、
+  // このフィールド追加より前に保存されたデータではsalesBackRatesが欠けていることがある。
+  // payrollRankBonus()と同じく、フィールドごとにデフォルト値へフォールバックする。
+  const rate = rates[key] ?? PAYROLL_DEFAULT_SALES_BACK_RATES[key] ?? 0;
   if (rate <= 0) return 0;
   const raw = subtotal * (rate / 100);
   const mode = rates.roundMode || "floor";
