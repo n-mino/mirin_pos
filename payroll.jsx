@@ -94,8 +94,11 @@ function payrollEmployeeColor(employeeId, employees) {
   return PAYROLL_EMPLOYEE_COLORS[(idx < 0 ? 0 : idx) % PAYROLL_EMPLOYEE_COLORS.length];
 }
 
+// 勤務時間は15分(0.25時間)単位でしか発生しないため、四捨五入せずそのまま0.25単位で表示する
+// (例: 2時間15分 → "2.25時間"。toFixed(1)による丸め表示("2.3時間")はしない)。
 function formatHours(n) {
-  return `${n.toFixed(1)}時間`;
+  const snapped = Math.round(n * 4) / 4;
+  return `${snapped}時間`;
 }
 
 const payrollSelectStyle = {
@@ -1105,6 +1108,7 @@ function PayrollScreen({ payroll, salesHistory, onUpdatePayroll, onOpenSettings,
     onUpdatePayroll({ shifts: list });
     setEditingShiftId(null);
     showToast(isUpdate ? "更新しました" : "追加しました");
+    if (isUpdate) setTab("list"); // 勤怠一覧から編集して更新した場合は一覧に戻る
   };
 
   const deleteShift = (id) => {
