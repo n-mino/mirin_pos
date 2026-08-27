@@ -580,7 +580,7 @@ function SalesBackBreakdownCard({ salesHistory, employees, dateMode, dateValue, 
     return isSameDate(s.endTime, dateValue);
   });
 
-  const map = new Map();
+  const map = new Map(); // name -> { count, amount }
   filteredSales.forEach((s) => {
     const kind = companionEffectiveKind(s.companion, s.companionKind);
     if (!kind) return;
@@ -591,12 +591,17 @@ function SalesBackBreakdownCard({ salesHistory, employees, dateMode, dateValue, 
       const emp = employees.find((e) => e.id === selectedEmployeeId);
       if (!emp || emp.name !== name) return;
     }
-    map.set(name, (map.get(name) || 0) + amount);
+    const cur = map.get(name) || { count: 0, amount: 0 };
+    cur.count += 1;
+    cur.amount += amount;
+    map.set(name, cur);
   });
 
   const entries = Array.from(map.entries());
-  const total = entries.reduce((sum, [, v]) => sum + v, 0);
+  const totalCount = entries.reduce((sum, [, v]) => sum + v.count, 0);
+  const totalAmount = entries.reduce((sum, [, v]) => sum + v.amount, 0);
   const label = dateMode === "today" ? "本日" : dateValue;
+  const cols = "1fr 60px 100px";
 
   return (
     <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20, marginTop: 20 }}>
@@ -605,15 +610,22 @@ function SalesBackBreakdownCard({ salesHistory, employees, dateMode, dateValue, 
         <div style={{ fontSize: 12, color: COLORS.inkSoft, textAlign: "center", padding: "6px 0" }}>該当する売上バックはありません。</div>
       ) : (
         <>
-          {entries.map(([name, amount]) => (
-            <div key={name} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px dashed ${COLORS.line}`, fontSize: 13, color: COLORS.ink }}>
+          <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "0 0 4px", fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>
+            <span>名前</span>
+            <span style={{ textAlign: "right" }}>件数</span>
+            <span style={{ textAlign: "right" }}>合計金額</span>
+          </div>
+          {entries.map(([name, v]) => (
+            <div key={name} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, alignItems: "center", padding: "5px 0", borderBottom: `1px dashed ${COLORS.line}`, fontSize: 13, color: COLORS.ink }}>
               <span>{name}</span>
-              <span style={{ fontFamily: MONO, fontWeight: 700, color: COLORS.sage }}>{formatYen(amount)}</span>
+              <span style={{ fontFamily: MONO, color: COLORS.inkSoft, textAlign: "right" }}>{v.count}件</span>
+              <span style={{ fontFamily: MONO, fontWeight: 700, color: COLORS.sage, textAlign: "right" }}>{formatYen(v.amount)}</span>
             </div>
           ))}
-          <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, marginTop: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8, alignItems: "center", paddingTop: 8, marginTop: 4 }}>
             <span style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700 }}>合計</span>
-            <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{formatYen(total)}</span>
+            <span style={{ fontFamily: MONO, fontSize: 12, color: COLORS.inkSoft, textAlign: "right" }}>{totalCount}件</span>
+            <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: COLORS.ink, textAlign: "right" }}>{formatYen(totalAmount)}</span>
           </div>
         </>
       )}
