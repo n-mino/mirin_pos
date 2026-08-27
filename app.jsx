@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/27 17:45";
+const APP_LAST_UPDATED = "2026/08/27 18:02";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -1853,7 +1853,7 @@ function UserGuidePanel() {
           座席カードをタップ→人数を選択(同伴のお客様の場合は「同伴」にチェック)して「開始する」→商品をタップして注文を追加→「会計へ進む」→お支払い方法(現金・カード・PayPay・売掛)を入力し「会計を確定して座席を空ける」で完了します。
         </GuideItem>
         <GuideItem label="同伴・呼込み">
-          人数入力時に「呼込み」または「同伴」をチェックすると(どちらか一方のみ選択できます)、担当するアルバイトを選択するリストが表示されます。選択すると座席カードに「使用中[担当者名](呼込または同伴)」、注文画面の見出しに「座席名　呼込または同伴：担当者名」と表示され、会計後は売上履歴・日次集計の「呼込み」または「同伴」列に担当者名が記録されます。
+          人数入力時に「呼込み」または「同伴」をチェックすると(どちらか一方のみ選択できます)、担当するアルバイトを選択するリストが表示されます。選択すると座席カードに「使用中[担当者名](呼込または同伴)」、注文画面の見出しに「座席名　呼込または同伴：担当者名」と表示され、会計後は売上履歴・日次集計の「呼込み」または「同伴」列に担当者名が記録されます。「同伴」で開始した場合は、注文リストに「同伴 ¥3,000」が自動で追加されます(通常の商品と同様に数量変更・削除が可能です)。
         </GuideItem>
         <GuideItem label="座席カードの色分け">
           使用中の座席カードは経過時間に応じて緑→黄→赤の順に色が変わります。切り替わりまでの時間はマスタ設定の「座席設定」で変更できます(初期値: 黄30分・赤60分)。
@@ -3052,6 +3052,11 @@ function App() {
 
   const handleConfirmGuests = (count, companionKind, companion) => {
     const n = guestModalSeat;
+    // 同伴で開始した場合、注文リストに「同伴」料金(¥3,000)を自動追加しておく
+    // (通常の商品と同じ形の注文行として追加するだけなので、後から数量調整・削除も可能)
+    const initialOrders = companion && companionKind === "companion"
+      ? [{ id: uid("ord"), productId: null, name: "同伴", price: 3000, qty: 1 }]
+      : [];
     const newSeats = {
       ...dataRef.current.seats,
       [n]: {
@@ -3059,7 +3064,7 @@ function App() {
         companion: companion || "",
         companionKind: companion ? companionKind : "",
         startTime: new Date().toISOString(),
-        orders: [],
+        orders: initialOrders,
       },
     };
     persist({ ...dataRef.current, seats: newSeats });
