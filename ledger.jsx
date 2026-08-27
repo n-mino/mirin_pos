@@ -243,7 +243,7 @@ function DailySalesTable({ sales }) {
   }
   return (
     <div style={{ overflowX: "auto" }}>
-      <div style={{ minWidth: 1410 }}>
+      <div style={{ minWidth: 1500 }}>
         <div
           style={{
             display: "grid",
@@ -269,6 +269,7 @@ function DailySalesTable({ sales }) {
           <div>カード</div>
           <div>PayPay</div>
           <div>売掛</div>
+          <div>売上バック</div>
           <div>メモ</div>
         </div>
         {sales.map((s) => (
@@ -300,6 +301,7 @@ function DailySalesTable({ sales }) {
             <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
             <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
             <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
+            <div>{s.salesBackAmount > 0 ? formatYen(s.salesBackAmount) : "-"}</div>
             <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {s.memo || ""}
             </div>
@@ -455,7 +457,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   };
 
   const salesRowsHtml = sales.length === 0
-    ? `<tr><td colspan="14" style="text-align:center;color:#5B6459">該当する会計データがありません</td></tr>`
+    ? `<tr><td colspan="15" style="text-align:center;color:#5B6459">該当する会計データがありません</td></tr>`
     : sales.map((s) => {
       const kind = companionEffectiveKind(s.companion, s.companionKind);
       return `
@@ -473,6 +475,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
         <td class="num">${s.payments?.card ? escapeHtml(formatYen(s.payments.card)) : "-"}</td>
         <td class="num">${s.payments?.paypay ? escapeHtml(formatYen(s.payments.paypay)) : "-"}</td>
         <td class="num">${s.payments?.onAccount ? escapeHtml(formatYen(s.payments.onAccount)) : "-"}</td>
+        <td class="num">${s.salesBackAmount > 0 ? escapeHtml(formatYen(s.salesBackAmount)) : "-"}</td>
         <td>${escapeHtml(s.memo || "")}</td>
       </tr>
     `;
@@ -527,7 +530,7 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
   <h2>売上履歴</h2>
   <div class="sub">会計 ${sales.length}件　合計 ${escapeHtml(formatYen(salesTotal))}</div>
   <table>
-    <thead><tr><th>日時</th><th>座席</th><th>人数</th><th>呼込み</th><th>同伴</th><th>小計</th><th>サービス料</th><th>消費税</th><th>合計</th><th>現金</th><th>カード</th><th>PayPay</th><th>売掛</th><th>メモ</th></tr></thead>
+    <thead><tr><th>日時</th><th>座席</th><th>人数</th><th>呼込み</th><th>同伴</th><th>小計</th><th>サービス料</th><th>消費税</th><th>合計</th><th>現金</th><th>カード</th><th>PayPay</th><th>売掛</th><th>売上バック</th><th>メモ</th></tr></thead>
     <tbody>${salesRowsHtml}</tbody>
   </table>
 
@@ -1002,7 +1005,7 @@ function AggregationGraphPanel({ data }) {
 /* ---------------------------------------------------------
    売上履歴パネル(売上管理内のサブタブ)
 --------------------------------------------------------- */
-const HISTORY_TABLE_COLS = "170px 110px 60px 90px 90px 90px 90px 90px 100px 90px 90px 90px 90px 160px";
+const HISTORY_TABLE_COLS = "170px 110px 60px 90px 90px 90px 90px 90px 100px 90px 90px 90px 90px 90px 160px";
 
 function SalesHistoryPanel({ salesHistory, onSelectSale }) {
   const [mode, setMode] = useState("today"); // today | all | date
@@ -1088,7 +1091,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
       )}
       {filtered.length > 0 && (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 1410 }}>
+          <div style={{ minWidth: 1500 }}>
             <div
               style={{
                 display: "grid",
@@ -1114,6 +1117,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
               <div>カード</div>
               <div>PayPay</div>
               <div>売掛</div>
+              <div>売上バック</div>
               <div>メモ</div>
             </div>
             {filtered.map((s) => (
@@ -1154,6 +1158,7 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
                 <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
                 <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
                 <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
+                <div>{s.salesBackAmount > 0 ? formatYen(s.salesBackAmount) : "-"}</div>
                 <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {s.memo || ""}
                 </div>

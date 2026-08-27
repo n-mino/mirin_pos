@@ -317,18 +317,27 @@ function RankBonusSettingsPanel({ rankBonusRates, onSave }) {
 }
 
 // アルバイトマスタ右側、ランク別時給アップ額の下に配置する「売上バックの率」設定。
-// 現時点では入力欄の用意のみで、実際の計算(集計・給与への反映)には使用しない(ユーザー指示による)。
+// 「小計30,000円超」「5人以上+小計50,000円超」は会計確定時に自動計算され、売上履歴の
+// 「売上バック」列に反映される。「ボトル関連」は判定条件が未定のため入力欄のみで計算には未使用。
+const PAYROLL_ROUND_MODES = [
+  { key: "floor", label: "切り捨て" },
+  { key: "ceil", label: "切り上げ" },
+  { key: "round", label: "四捨五入" },
+];
+
 function SalesBackRateSettingsPanel({ salesBackRates, onSave }) {
   const initial = (key) => String(salesBackRates?.[key] ?? PAYROLL_DEFAULT_SALES_BACK_RATES[key]);
   const [over30k, setOver30k] = useState(initial("over30k"));
   const [group5over50k, setGroup5over50k] = useState(initial("group5over50k"));
   const [bottle, setBottle] = useState(initial("bottle"));
+  const [roundMode, setRoundMode] = useState(salesBackRates?.roundMode || "floor");
 
   const handleSave = () => {
     onSave({
       over30k: Math.max(0, Number(over30k) || 0),
       group5over50k: Math.max(0, Number(group5over50k) || 0),
       bottle: Math.max(0, Number(bottle) || 0),
+      roundMode,
     });
   };
 
@@ -347,6 +356,21 @@ function SalesBackRateSettingsPanel({ salesBackRates, onSave }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
         <label style={{ fontSize: 12, color: COLORS.inkSoft, width: 160, flexShrink: 0 }}>ボトル関連</label>
         <input type="number" min="0" value={bottle} onChange={(e) => setBottle(e.target.value)} style={{ ...payrollFieldInputStyle, marginTop: 0, fontFamily: MONO }} />
+      </div>
+
+      <div style={{ marginBottom: 18 }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>円未満の端数処理</label>
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          {PAYROLL_ROUND_MODES.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setRoundMode(opt.key)}
+              style={{ ...payrollPillStyle(roundMode === opt.key), flex: 1, textAlign: "center" }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <TicketButton variant="primary" onClick={handleSave} style={{ width: "100%" }}>保存</TicketButton>
@@ -541,7 +565,60 @@ function ShiftEntryPanel({ employees, shifts, editingShift, onSave, onCancelEdit
 --------------------------------------------------------- */
 const SHIFT_TABLE_COLS = "100px 90px 100px 110px 70px 80px 90px 80px 80px 80px 90px 140px 100px";
 
-function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, onTogglePaid }) {
+// 勤怠一覧の下に表示する「売上バック内訳」カード。売上履歴に会計確定時点で記録済みの
+// 売上バック額(呼込み/同伴の担当者ごと)を、一覧側と同じ日付/個別・全員一括の条件で
+// その場で集計するだけの表示専用機能で、勤怠データへの反映(同伴バック/売上バック欄への
+// 自動入力)は行わない。日付・名前を見ながら「勤怠一覧の編集」で手入力する運用を想定している。
+function SalesBackBreakdownCard({ salesHistory, employees, dateMode, dateValue, viewMode, selectedEmployeeId }) {
+  if (dateMode === "all") return null;
+
+  const filteredSales = (salesHistory || []).filter((s) => {
+    if (dateMode === "today") return isToday(s.endTime);
+    return isSameDate(s.endTime, dateValue);
+  });
+
+  const map = new Map();
+  filteredSales.forEach((s) => {
+    const kind = companionEffectiveKind(s.companion, s.companionKind);
+    if (!kind) return;
+    const amount = s.salesBackAmount || 0;
+    if (amount <= 0) return;
+    const name = companionLabel(s.companion);
+    if (viewMode === "individual") {
+      const emp = employees.find((e) => e.id === selectedEmployeeId);
+      if (!emp || emp.name !== name) return;
+    }
+    map.set(name, (map.get(name) || 0) + amount);
+  });
+
+  const entries = Array.from(map.entries());
+  const total = entries.reduce((sum, [, v]) => sum + v, 0);
+  const label = dateMode === "today" ? "本日" : dateValue;
+
+  return (
+    <div style={{ background: COLORS.paper, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: 20, marginTop: 20 }}>
+      <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 700, marginBottom: 12 }}>売上バック内訳({label})</div>
+      {entries.length === 0 ? (
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, textAlign: "center", padding: "6px 0" }}>該当する売上バックはありません。</div>
+      ) : (
+        <>
+          {entries.map(([name, amount]) => (
+            <div key={name} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px dashed ${COLORS.line}`, fontSize: 13, color: COLORS.ink }}>
+              <span>{name}</span>
+              <span style={{ fontFamily: MONO, fontWeight: 700, color: COLORS.sage }}>{formatYen(amount)}</span>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, marginTop: 4 }}>
+            <span style={{ fontSize: 12, color: COLORS.inkSoft, fontWeight: 700 }}>合計</span>
+            <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{formatYen(total)}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ShiftListPanel({ employees, shifts, rankBonusRates, salesHistory, onEdit, onDelete, onTogglePaid }) {
   const [viewMode, setViewMode] = useState("all"); // individual | all
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(employees[0]?.id || "");
   const [dateMode, setDateMode] = useState("today"); // today | all | date
@@ -758,6 +835,15 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, onEdit, onDelete, o
           </div>
         </div>
       )}
+
+      <SalesBackBreakdownCard
+        salesHistory={salesHistory}
+        employees={employees}
+        dateMode={dateMode}
+        dateValue={dateValue}
+        viewMode={viewMode}
+        selectedEmployeeId={selectedEmployeeId}
+      />
 
       {deletingShiftId && (
         <ConfirmModal
@@ -1005,7 +1091,7 @@ const PAYROLL_TABS = [
   { id: "agg", label: "集計" },
 ];
 
-function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab, onSelectHomeTab, showToast }) {
+function PayrollScreen({ payroll, salesHistory, onUpdatePayroll, onOpenSettings, activeHomeTab, onSelectHomeTab, showToast }) {
   const [tab, setTab] = useState(PAYROLL_TABS[0].id);
   const [editingShiftId, setEditingShiftId] = useState(null);
 
@@ -1070,6 +1156,7 @@ function PayrollScreen({ payroll, onUpdatePayroll, onOpenSettings, activeHomeTab
             employees={employees}
             shifts={shifts}
             rankBonusRates={rankBonusRates}
+            salesHistory={salesHistory}
             onEdit={(id) => { setEditingShiftId(id); setTab("entry"); }}
             onDelete={deleteShift}
             onTogglePaid={togglePaidDate}

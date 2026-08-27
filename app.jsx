@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/26 20:32";
+const APP_LAST_UPDATED = "2026/08/27 16:31";
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -223,7 +223,7 @@ function defaultData() {
       employees: [],
       shifts: [],
       rankBonusRates: { call: 100, companion: 200, other: 0 },
-      salesBackRates: { over30k: 10, group5over50k: 30, bottle: 10 },
+      salesBackRates: { over30k: 10, group5over50k: 30, bottle: 10, roundMode: "floor" },
     },
     cashFlow: { records: {} }, // 日付(YYYY-MM-DD) -> { expenses:[], income:[] }
     security: {
@@ -299,6 +299,22 @@ function companionEffectiveKind(companion, companionKind) {
 
 function companionKindLabel(kind) {
   return kind === "call" ? "呼込" : kind === "companion" ? "同伴" : "";
+}
+
+// 会計確定時に呼込み/同伴の担当者へつく売上バックの金額を計算する。
+// 「5人以上+小計50,000円超」は「小計30,000円超」も自動的に満たすため、
+// 両方に該当する場合は高い方(5人以上+50,000円超)の率のみを採用する(加算しない)。
+function computeSalesBackAmount(subtotal, guests, salesBackRates) {
+  const rates = salesBackRates || {};
+  const condGroup = guests >= 5 && subtotal > 50000;
+  const condOver30k = subtotal > 30000;
+  const rate = condGroup ? (rates.group5over50k || 0) : condOver30k ? (rates.over30k || 0) : 0;
+  if (rate <= 0) return 0;
+  const raw = subtotal * (rate / 100);
+  const mode = rates.roundMode || "floor";
+  if (mode === "ceil") return Math.ceil(raw);
+  if (mode === "round") return Math.round(raw);
+  return Math.floor(raw);
 }
 
 function formatElapsed(startIso, nowMs) {
@@ -474,7 +490,7 @@ function csvTimestamp() {
 
 // 売上履歴(売上管理内の売上履歴タブ・マスタ設定の全件書き出し双方で使う行データ)
 function salesHistoryToCsvRows(salesHistory) {
-  const rows = [["会計ID", "日時", "座席", "人数", "呼込み", "同伴", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "メモ"]];
+  const rows = [["会計ID", "日時", "座席", "人数", "呼込み", "同伴", "小計", "サービス料", "消費税", "合計", "現金", "カード", "PayPay", "ツケ", "売上バック", "メモ"]];
   (salesHistory || []).forEach((s) => {
     const kind = companionEffectiveKind(s.companion, s.companionKind);
     rows.push([
@@ -482,6 +498,7 @@ function salesHistoryToCsvRows(salesHistory) {
       kind === "call" ? companionLabel(s.companion) : "", kind === "companion" ? companionLabel(s.companion) : "",
       s.subtotal, s.serviceCharge, s.tax, s.total,
       s.payments?.cash || 0, s.payments?.card || 0, s.payments?.paypay || 0, s.payments?.onAccount || 0,
+      s.salesBackAmount || 0,
       s.memo || "",
     ]);
   });
@@ -1843,7 +1860,7 @@ function UserGuidePanel() {
 
       <GuideSection title="② 売上管理">
         <GuideItem label="売上履歴">
-          「本日のみ」「すべて」、または日付を指定して過去の会計記録を一覧表示できます。一覧上部に該当件数・合計金額を表示します。行をタップすると明細(注文内容)を確認できます。画面右上の「CSVダウンロード」で、表示中の絞り込み条件のままCSVファイルとして書き出せます。
+          「本日のみ」「すべて」、または日付を指定して過去の会計記録を一覧表示できます。一覧上部に該当件数・合計金額を表示します。行をタップすると明細(注文内容)を確認できます。呼込み/同伴の担当者がいて、小計が一定額を超えた会計には、アルバイトマスタで設定した率に応じた「売上バック」が自動計算され列に表示されます(条件:小計30,000円超、または5人以上で小計50,000円超。両方満たす場合は高い方の率を採用)。画面右上の「CSVダウンロード」で、表示中の絞り込み条件のままCSVファイルとして書き出せます。
         </GuideItem>
         <GuideItem label="入出金入力">
           日付ごとに、レジからの出金(仕入れなど)・入金(釣銭準備金など)を「摘要」「金額」で記録します。「+項目追加」で行を増やせます。
@@ -1864,7 +1881,7 @@ function UserGuidePanel() {
           従業員・日付・開始/終了時刻(15分単位)を入力して記録します。「ランク」で「呼込み/同伴/その他」のいずれかを選ぶと、アルバイトマスタで設定した金額がその勤務日の時給に1時間あたり加算されます(選び直す・もう一度押して解除することもできます。複数は同時に選べません)。「同伴」を選ぶと「同伴バック」欄に金額(¥3,000)が自動入力されます(必要に応じて手動で変更できます)。「呼込み」「その他」を選ぶ、または「同伴」を解除すると、自動入力された同伴バックの金額はクリアされます。「同伴バック」「売上バック」は勤務時間に関係なく加算される金額です。日給を入力した場合は、時給×時間の計算より日給が優先されます(ランク・バックはそのまま加算されます)。同じ従業員・同じ日付ですでに登録されている時間帯と重なる場合は保存できません(エラーメッセージが表示されます)。
         </GuideItem>
         <GuideItem label="勤怠一覧">
-          「個別」で従業員ごと、「全員一括」で全員分の勤怠記録を確認できます。「本日のみ」「すべて」、または日付を指定して絞り込めます。一覧上部に該当件数・合計金額を表示します。「編集」ボタンから、勤怠入力時に選んだランクを含めて内容を変更できます。「支払日」列の隣のボタンを押すと、支払った日付(本日)が記録され、アルバイト代を支払い済みかどうかを一覧で判別できます(もう一度押すと取り消せます)。「CSVダウンロード」で表示中のデータを書き出せます。
+          「個別」で従業員ごと、「全員一括」で全員分の勤怠記録を確認できます。「本日のみ」「すべて」、または日付を指定して絞り込めます。一覧上部に該当件数・合計金額を表示します。「編集」ボタンから、勤怠入力時に選んだランクを含めて内容を変更できます。「支払日」列の隣のボタンを押すと、支払った日付(本日)が記録され、アルバイト代を支払い済みかどうかを一覧で判別できます(もう一度押すと取り消せます)。「CSVダウンロード」で表示中のデータを書き出せます。一覧の下には「売上バック内訳」が表示され、絞り込み条件(個別/全員一括、本日のみ/日付指定)に応じてその期間の売上バック額を担当者ごとに集計します(「すべて」選択時は表示されません)。この金額は自動で勤怠データに反映されるわけではないため、確認しながら「同伴バック」「売上バック」欄に手入力してください。
         </GuideItem>
         <GuideItem label="集計">
           月次・年次で従業員ごとの給与を自動集計します(ランクによる時給アップ分・バックも反映されます)。
@@ -1882,7 +1899,7 @@ function UserGuidePanel() {
           サービス料率・消費税率を設定します。会計時は「小計→サービス料→消費税」の順で自動計算されます。
         </GuideItem>
         <GuideItem label="アルバイトマスタ">
-          左側で従業員の氏名・時給を登録・編集・削除します。右側の「ランク別時給アップ額」では、勤怠入力の「呼込み/同伴/その他」を選んだ際に時給へ加算する金額(1時間あたり)を、全従業員共通で設定できます。その下の「売上バックの率」は入力欄のみで、現時点では給与計算には反映されません。
+          左側で従業員の氏名・時給を登録・編集・削除します。右側の「ランク別時給アップ額」では、勤怠入力の「呼込み/同伴/その他」を選んだ際に時給へ加算する金額(1時間あたり)を、全従業員共通で設定できます。その下の「売上バックの率」(小計30,000円超/5人以上+小計50,000円超の2条件と、円未満の端数処理)は、会計確定時に自動計算される「売上バック」に使われます(「ボトル関連」は条件未定のため入力欄のみで、計算には使われません)。
         </GuideItem>
         <GuideItem label="パスワード設定">
           売上管理・アルバイト管理の2画面それぞれにパスワードを設定できます(売上履歴は売上管理内のタブのため、売上管理のパスワードが適用されます)。両方に設定する場合は「共通のパスワード」か「画面ごとに個別」かを選べます。「ロックのタイミング」では、アプリ起動中は初回のみ確認するか、画面を開くたび毎回確認するかを選べます。パスワードを忘れた場合は、この画面下部の「パスワードをリセット」から専用のキーワードを入力するとすべての設定を解除できます。このリセット用キーワード、および「パスワード設定」タブ自体を開くためのパスワードは、アプリ制作者に確認してください。
@@ -3065,13 +3082,15 @@ function App() {
   const handleCheckoutConfirm = (payments, bill, memo) => {
     const n = activeSeat;
     const seat = dataRef.current.seats[n];
+    const companionKind = companionEffectiveKind(seat.companion, seat.companionKind);
     const record = {
       id: uid("sale"),
       seatId: n,
       seatName: dataRef.current.seatNames?.[n] || "",
       guests: seat.guests,
       companion: companionLabel(seat.companion),
-      companionKind: companionEffectiveKind(seat.companion, seat.companionKind),
+      companionKind,
+      salesBackAmount: companionKind ? computeSalesBackAmount(bill.subtotal, seat.guests, dataRef.current.payroll.salesBackRates) : 0,
       startTime: seat.startTime,
       endTime: new Date().toISOString(),
       orders: seat.orders,
@@ -3191,6 +3210,7 @@ function App() {
       {screen === "payroll" && (
         <PayrollScreen
           payroll={data.payroll}
+          salesHistory={data.salesHistory}
           onUpdatePayroll={onUpdatePayroll}
           onOpenSettings={() => setScreen("settings")}
           activeHomeTab={homeTab}
