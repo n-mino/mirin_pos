@@ -152,16 +152,32 @@ const payrollFieldInputStyle = {
 const PAYROLL_TIME_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const PAYROLL_TIME_MINUTES = ["00", "15", "30", "45"];
 
+// 現在時刻を15分単位に切り捨てたもの(TimeStepSelectの分の選択肢に合わせるため)。
+function currentRoundedTime() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(Math.floor(now.getMinutes() / 15) * 15).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 // ネイティブ<input type="time">はOS/ブラウザによってstepの分刻み制限が
 // 効かない(自由に分を入力・選択できてしまう)ため、時・分を別セレクトにして
-// 15分単位以外を選べないようにする
+// 15分単位以外を選べないようにする。
+// 未入力(空欄)の状態でどちらかのセレクトを開く(フォーカスする)と、その時点で
+// 現在時刻(15分単位切り捨て)を選択済みの状態にする。何も操作していない間は
+// 「時」「分」のプレースホルダー表示のまま変わらない。
 function TimeStepSelect({ value, onChange }) {
   const [h, m] = (value || "").split(":");
+
+  const handleFocus = () => {
+    if (!value) onChange(currentRoundedTime());
+  };
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
       <select
         value={h || ""}
+        onFocus={handleFocus}
         onChange={(e) => onChange(`${e.target.value}:${m || "00"}`)}
         style={{ ...payrollFieldInputStyle, width: "auto", flex: 1, marginTop: 0, fontFamily: MONO }}
       >
@@ -173,6 +189,7 @@ function TimeStepSelect({ value, onChange }) {
       <span style={{ color: COLORS.inkSoft }}>:</span>
       <select
         value={m || ""}
+        onFocus={handleFocus}
         onChange={(e) => onChange(`${h || "00"}:${e.target.value}`)}
         style={{ ...payrollFieldInputStyle, width: "auto", flex: 1, marginTop: 0, fontFamily: MONO }}
       >
