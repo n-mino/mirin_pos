@@ -293,15 +293,15 @@ function DailySalesTable({ sales }) {
             <div>{s.guests}名</div>
             <div>{companionEffectiveKind(s.companion, s.companionKind) === "call" ? companionLabel(s.companion) : ""}</div>
             <div>{companionEffectiveKind(s.companion, s.companionKind) === "companion" ? companionLabel(s.companion) : ""}</div>
-            <div>{formatYen(s.subtotal)}</div>
-            <div>{formatYen(s.serviceCharge)}</div>
-            <div>{formatYen(s.tax)}</div>
-            <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
-            <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
-            <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
-            <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
-            <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
-            <div>{s.salesBackAmount > 0 ? formatYen(s.salesBackAmount) : "-"}</div>
+            <div>{formatNum(s.subtotal)}</div>
+            <div>{formatNum(s.serviceCharge)}</div>
+            <div>{formatNum(s.tax)}</div>
+            <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatNum(s.total)}</div>
+            <div>{s.payments?.cash ? formatNum(s.payments.cash) : "-"}</div>
+            <div>{s.payments?.card ? formatNum(s.payments.card) : "-"}</div>
+            <div>{s.payments?.paypay ? formatNum(s.payments.paypay) : "-"}</div>
+            <div>{s.payments?.onAccount ? formatNum(s.payments.onAccount) : "-"}</div>
+            <div>{s.salesBackAmount > 0 ? formatNum(s.salesBackAmount) : "-"}</div>
             <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {s.memo || ""}
             </div>
@@ -373,7 +373,7 @@ function DailyShiftTable({ shifts, employees, rankBonusRates }) {
               </div>
               <div>{shift.startTime}-{shift.endTime}</div>
               <div>{formatHours(hours)}</div>
-              <div>{emp ? formatYen(wage) : "-"}</div>
+              <div>{emp ? formatNum(wage) : "-"}</div>
               <div>
                 {shift.rankKey ? (
                   <span style={{ color: payrollRankColor(shift.rankKey), fontWeight: 700 }}>
@@ -381,10 +381,10 @@ function DailyShiftTable({ shifts, employees, rankBonusRates }) {
                   </span>
                 ) : "-"}
               </div>
-              <div>{shift.dailyWage > 0 ? formatYen(shift.dailyWage) : "-"}</div>
-              <div>{shift.option > 0 ? formatYen(shift.option) : "-"}</div>
-              <div>{shift.option2 > 0 ? formatYen(shift.option2) : "-"}</div>
-              <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(total)}</div>
+              <div>{shift.dailyWage > 0 ? formatNum(shift.dailyWage) : "-"}</div>
+              <div>{shift.option > 0 ? formatNum(shift.option) : "-"}</div>
+              <div>{shift.option2 > 0 ? formatNum(shift.option2) : "-"}</div>
+              <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatNum(total)}</div>
               <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {shift.note || ""}
               </div>
@@ -467,15 +467,15 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
         <td class="num">${s.guests}名</td>
         <td class="num">${kind === "call" ? escapeHtml(companionLabel(s.companion)) : ""}</td>
         <td class="num">${kind === "companion" ? escapeHtml(companionLabel(s.companion)) : ""}</td>
-        <td class="num">${escapeHtml(formatYen(s.subtotal))}</td>
-        <td class="num">${escapeHtml(formatYen(s.serviceCharge))}</td>
-        <td class="num">${escapeHtml(formatYen(s.tax))}</td>
-        <td class="num">${escapeHtml(formatYen(s.total))}</td>
-        <td class="num">${s.payments?.cash ? escapeHtml(formatYen(s.payments.cash)) : "-"}</td>
-        <td class="num">${s.payments?.card ? escapeHtml(formatYen(s.payments.card)) : "-"}</td>
-        <td class="num">${s.payments?.paypay ? escapeHtml(formatYen(s.payments.paypay)) : "-"}</td>
-        <td class="num">${s.payments?.onAccount ? escapeHtml(formatYen(s.payments.onAccount)) : "-"}</td>
-        <td class="num">${s.salesBackAmount > 0 ? escapeHtml(formatYen(s.salesBackAmount)) : "-"}</td>
+        <td class="num">${escapeHtml(formatNum(s.subtotal))}</td>
+        <td class="num">${escapeHtml(formatNum(s.serviceCharge))}</td>
+        <td class="num">${escapeHtml(formatNum(s.tax))}</td>
+        <td class="num">${escapeHtml(formatNum(s.total))}</td>
+        <td class="num">${s.payments?.cash ? escapeHtml(formatNum(s.payments.cash)) : "-"}</td>
+        <td class="num">${s.payments?.card ? escapeHtml(formatNum(s.payments.card)) : "-"}</td>
+        <td class="num">${s.payments?.paypay ? escapeHtml(formatNum(s.payments.paypay)) : "-"}</td>
+        <td class="num">${s.payments?.onAccount ? escapeHtml(formatNum(s.payments.onAccount)) : "-"}</td>
+        <td class="num">${s.salesBackAmount > 0 ? escapeHtml(formatNum(s.salesBackAmount)) : "-"}</td>
         <td>${escapeHtml(s.memo || "")}</td>
       </tr>
     `;
@@ -492,12 +492,12 @@ function printDailySummary({ targetDate, summaryRows, remaining, expenses, incom
           <td>${escapeHtml(emp ? emp.name : "(削除済み)")}</td>
           <td>${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)}</td>
           <td class="num">${escapeHtml(formatHours(hours))}</td>
-          <td class="num">${emp ? escapeHtml(formatYen(wage)) : "-"}</td>
+          <td class="num">${emp ? escapeHtml(formatNum(wage)) : "-"}</td>
           <td>${escapeHtml(payrollRankLabel(shift.rankKey))}</td>
-          <td class="num">${shift.dailyWage > 0 ? escapeHtml(formatYen(shift.dailyWage)) : "-"}</td>
-          <td class="num">${shift.option > 0 ? escapeHtml(formatYen(shift.option)) : "-"}</td>
-          <td class="num">${shift.option2 > 0 ? escapeHtml(formatYen(shift.option2)) : "-"}</td>
-          <td class="num">${escapeHtml(formatYen(total))}</td>
+          <td class="num">${shift.dailyWage > 0 ? escapeHtml(formatNum(shift.dailyWage)) : "-"}</td>
+          <td class="num">${shift.option > 0 ? escapeHtml(formatNum(shift.option)) : "-"}</td>
+          <td class="num">${shift.option2 > 0 ? escapeHtml(formatNum(shift.option2)) : "-"}</td>
+          <td class="num">${escapeHtml(formatNum(total))}</td>
           <td>${escapeHtml(shift.note || "")}</td>
           <td>${escapeHtml(shift.paidDate || "-")}</td>
         </tr>
@@ -1150,15 +1150,15 @@ function SalesHistoryPanel({ salesHistory, onSelectSale }) {
                 <div>{s.guests}名</div>
                 <div>{companionEffectiveKind(s.companion, s.companionKind) === "call" ? companionLabel(s.companion) : ""}</div>
                 <div>{companionEffectiveKind(s.companion, s.companionKind) === "companion" ? companionLabel(s.companion) : ""}</div>
-                <div>{formatYen(s.subtotal)}</div>
-                <div>{formatYen(s.serviceCharge)}</div>
-                <div>{formatYen(s.tax)}</div>
-                <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(s.total)}</div>
-                <div>{s.payments?.cash ? formatYen(s.payments.cash) : "-"}</div>
-                <div>{s.payments?.card ? formatYen(s.payments.card) : "-"}</div>
-                <div>{s.payments?.paypay ? formatYen(s.payments.paypay) : "-"}</div>
-                <div>{s.payments?.onAccount ? formatYen(s.payments.onAccount) : "-"}</div>
-                <div>{s.salesBackAmount > 0 ? formatYen(s.salesBackAmount) : "-"}</div>
+                <div>{formatNum(s.subtotal)}</div>
+                <div>{formatNum(s.serviceCharge)}</div>
+                <div>{formatNum(s.tax)}</div>
+                <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatNum(s.total)}</div>
+                <div>{s.payments?.cash ? formatNum(s.payments.cash) : "-"}</div>
+                <div>{s.payments?.card ? formatNum(s.payments.card) : "-"}</div>
+                <div>{s.payments?.paypay ? formatNum(s.payments.paypay) : "-"}</div>
+                <div>{s.payments?.onAccount ? formatNum(s.payments.onAccount) : "-"}</div>
+                <div>{s.salesBackAmount > 0 ? formatNum(s.salesBackAmount) : "-"}</div>
                 <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {s.memo || ""}
                 </div>

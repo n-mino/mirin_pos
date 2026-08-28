@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/28 16:16";
+const APP_LAST_UPDATED = "2026/08/28 18:34";
 
 // 商品追加/編集モーダルのカテゴリ選択で常に表示するデフォルトのカテゴリ。
 // 既存商品が使っている他のカテゴリ(「+新規」で追加したものを含む)は
@@ -269,6 +269,12 @@ function uid(prefix = "id") {
 
 function formatYen(n) {
   return `¥${Math.round(n).toLocaleString("ja-JP")}`;
+}
+
+// formatYenから¥記号を省いた表記。売上履歴・勤怠一覧など一覧表の行内の金額列に使う
+// (一覧上部の「n件・合計¥n」のサマリー行はformatYenのまま¥記号を残す方針)。
+function formatNum(n) {
+  return Math.round(n).toLocaleString("ja-JP");
 }
 
 function formatBytes(bytes) {
@@ -477,8 +483,10 @@ function formatDateTimeShort(iso) {
   return `${m}/${day} ${h}:${min}`;
 }
 
+// 売上履歴の「日時」列。終了側は日付(月/日)を省き時刻のみ表示する
+// (同じ会計内で日付が変わることは通常ないため、開始側にだけ日付を出せば十分という判断)。
 function formatDateTimeRange(startIso, endIso) {
-  return `${formatDateTimeShort(startIso)} ～ ${formatDateTimeShort(endIso)}`;
+  return `${formatDateTimeShort(startIso)} ～ ${formatTimeShort(endIso)}`;
 }
 
 function formatTimeShort(iso) {

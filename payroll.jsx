@@ -869,7 +869,7 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, salesHistory, onEdi
                   </div>
                   <div>{shift.startTime}-{shift.endTime}</div>
                   <div>{formatHours(hours)}</div>
-                  <div>{emp ? formatYen(wage) : "-"}</div>
+                  <div>{emp ? formatNum(wage) : "-"}</div>
                   <div>
                     {shift.rankKey ? (
                       <span style={{ color: payrollRankColor(shift.rankKey), fontWeight: 700 }}>
@@ -877,10 +877,10 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, salesHistory, onEdi
                       </span>
                     ) : "-"}
                   </div>
-                  <div>{shift.dailyWage > 0 ? formatYen(shift.dailyWage) : "-"}</div>
-                  <div>{shift.option > 0 ? formatYen(shift.option) : "-"}</div>
-                  <div>{shift.option2 > 0 ? formatYen(shift.option2) : "-"}</div>
-                  <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatYen(total)}</div>
+                  <div>{shift.dailyWage > 0 ? formatNum(shift.dailyWage) : "-"}</div>
+                  <div>{shift.option > 0 ? formatNum(shift.option) : "-"}</div>
+                  <div>{shift.option2 > 0 ? formatNum(shift.option2) : "-"}</div>
+                  <div style={{ fontWeight: 700, color: COLORS.teal }}>{formatNum(total)}</div>
                   <div style={{ fontFamily: SANS, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {shift.note || ""}
                   </div>
