@@ -591,7 +591,11 @@ const SHIFT_TABLE_COLS = "100px 90px 100px 110px 70px 80px 90px 80px 80px 80px 9
 // 売上バック額(呼込み/同伴の担当者ごと)を、一覧側と同じ日付/個別・全員一括の条件で
 // その場で集計するだけの表示専用機能で、勤怠データへの反映(同伴バック/売上バック欄への
 // 自動入力)は行わない。日付・名前を見ながら「勤怠一覧の編集」で手入力する運用を想定している。
-function SalesBackBreakdownCard({ salesHistory, employees, dateMode, dateValue, viewMode, selectedEmployeeId }) {
+// 売上履歴から「売上バック内訳」(名前ごとの件数・合計金額)を集計する。
+// SalesBackBreakdownCardの表示と、ShiftListPanelでの勤怠一覧側合計との
+// 突き合わせ(不一致警告)の両方で使う共通ロジック。
+// dateMode==="all"のときはnullを返す(内訳カード自体を表示しない仕様に合わせる)。
+function computeSalesBackBreakdown(salesHistory, employees, dateMode, dateValue, viewMode, selectedEmployeeId) {
   if (dateMode === "all") return null;
 
   const filteredSales = (salesHistory || []).filter((s) => {
@@ -619,6 +623,13 @@ function SalesBackBreakdownCard({ salesHistory, employees, dateMode, dateValue, 
   const entries = Array.from(map.entries());
   const totalCount = entries.reduce((sum, [, v]) => sum + v.count, 0);
   const totalAmount = entries.reduce((sum, [, v]) => sum + v.amount, 0);
+  return { entries, totalCount, totalAmount };
+}
+
+function SalesBackBreakdownCard({ salesHistory, employees, dateMode, dateValue, viewMode, selectedEmployeeId }) {
+  const breakdown = computeSalesBackBreakdown(salesHistory, employees, dateMode, dateValue, viewMode, selectedEmployeeId);
+  if (!breakdown) return null;
+  const { entries, totalCount, totalAmount } = breakdown;
   const label = dateMode === "today" ? "本日" : dateValue;
   const cols = "1fr 60px 100px";
 
@@ -677,6 +688,11 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, salesHistory, onEdi
   list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   const totalAmount = list.reduce((sum, s) => sum + payrollShiftTotal(s, employees, rankBonusRates).total, 0);
+  const salesBackTotal = list.reduce((sum, s) => sum + (s.option2 || 0), 0);
+  // 「売上バック内訳」カードの合計と突き合わせ、勤怠側の手入力額とずれていないか確認する。
+  // dateMode==="all"のときは内訳カード自体が非表示(比較対象がない)ため警告も出さない。
+  const salesBackBreakdown = computeSalesBackBreakdown(salesHistory, employees, dateMode, dateValue, viewMode, selectedEmployeeId);
+  const salesBackMismatch = salesBackBreakdown != null && salesBackBreakdown.totalAmount !== salesBackTotal;
 
   const exportShiftsCsv = () => {
     const rows = [["日付", "従業員", "開始", "終了", "勤務時間", "時給", "ランク", "日給", "同伴バック", "売上バック", "合計", "メモ", "支払日"]];
@@ -756,6 +772,8 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, salesHistory, onEdi
       <div
         style={{
           display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
           gap: 20,
           fontFamily: MONO,
           fontSize: 13,
@@ -765,6 +783,12 @@ function ShiftListPanel({ employees, shifts, rankBonusRates, salesHistory, onEdi
       >
         <span>勤怠 {list.length}件</span>
         <span>合計 {formatYen(totalAmount)}</span>
+        <span>売上バック合計 {formatYen(salesBackTotal)}</span>
+        {salesBackMismatch && (
+          <span style={{ fontFamily: SANS, background: "#FFF176", color: COLORS.ink, padding: "3px 8px", borderRadius: 4 }}>
+            勤怠一覧の売上バックの額を確認して下さい。
+          </span>
+        )}
       </div>
 
       {list.length === 0 ? (
