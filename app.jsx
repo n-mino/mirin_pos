@@ -193,7 +193,12 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/27 18:02";
+const APP_LAST_UPDATED = "2026/08/28 09:54";
+
+// 商品追加/編集モーダルのカテゴリ選択で常に表示するデフォルトのカテゴリ。
+// 既存商品が使っている他のカテゴリ(「+新規」で追加したものを含む)は
+// この配列とマージして表示するため、過去に登録したカテゴリも選択肢から消えない。
+const PRODUCT_DEFAULT_CATEGORIES = ["ドリンク", "フード", "ボトル"];
 
 const DEFAULT_PRODUCTS = [
   { id: "p1", name: "生ビール", price: 600, category: "ドリンク" },
@@ -304,18 +309,30 @@ function companionKindLabel(kind) {
 // 会計確定時に呼込み/同伴の担当者へつく売上バックの金額を計算する。
 // 「5人以上+小計50,000円超」は「小計30,000円超」も自動的に満たすため、
 // 両方に該当する場合は高い方(5人以上+50,000円超)の率のみを採用する(加算しない)。
-function computeSalesBackAmount(subtotal, guests, salesBackRates) {
+// 「ボトルバック」商品(products側でbottleBack:trueの商品)が注文に含まれる場合は
+// その売上額(価格×数量の合計)に「ボトル関連」の率をかけた額とも比較し、
+// 大きい方を採用する(合算はしない)。
+function computeSalesBackAmount(subtotal, guests, salesBackRates, orders, products) {
   const rates = salesBackRates || {};
-  const condGroup = guests >= 5 && subtotal > 50000;
-  const condOver30k = subtotal > 30000;
-  const key = condGroup ? "group5over50k" : condOver30k ? "over30k" : null;
-  if (!key) return 0;
   // 既存端末のlocalStorageはpayrollオブジェクトを丸ごと上書きする浅いマージのため、
   // このフィールド追加より前に保存されたデータではsalesBackRatesが欠けていることがある。
   // payrollRankBonus()と同じく、フィールドごとにデフォルト値へフォールバックする。
-  const rate = rates[key] ?? PAYROLL_DEFAULT_SALES_BACK_RATES[key] ?? 0;
-  if (rate <= 0) return 0;
-  const raw = subtotal * (rate / 100);
+  const rateFor = (key) => rates[key] ?? PAYROLL_DEFAULT_SALES_BACK_RATES[key] ?? 0;
+
+  const condGroup = guests >= 5 && subtotal > 50000;
+  const condOver30k = subtotal > 30000;
+  const baseKey = condGroup ? "group5over50k" : condOver30k ? "over30k" : null;
+  const baseRaw = baseKey ? subtotal * (rateFor(baseKey) / 100) : 0;
+
+  const bottleIds = new Set((products || []).filter((p) => p.bottleBack).map((p) => p.id));
+  const bottleSubtotal = (orders || []).reduce(
+    (sum, o) => sum + (bottleIds.has(o.productId) ? o.price * o.qty : 0),
+    0
+  );
+  const bottleRaw = bottleSubtotal > 0 ? bottleSubtotal * (rateFor("bottle") / 100) : 0;
+
+  const raw = Math.max(baseRaw, bottleRaw);
+  if (raw <= 0) return 0;
   const mode = rates.roundMode || "floor";
   if (mode === "ceil") return Math.ceil(raw);
   if (mode === "round") return Math.round(raw);
@@ -2588,7 +2605,7 @@ function SettingsScreen({ data, onBack, onUpdateProducts, onUpdateSeatCount, onU
       {editing !== null && (
         <ProductEditModal
           product={editing}
-          categories={Array.from(new Set(data.products.map((p) => p.category)))}
+          categories={Array.from(new Set([...PRODUCT_DEFAULT_CATEGORIES, ...data.products.map((p) => p.category)]))}
           onCancel={() => setEditing(null)}
           onSave={saveProduct}
         />
@@ -2722,6 +2739,14 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
   const [price, setPrice] = useState(product.price != null ? String(product.price) : "");
   const [category, setCategory] = useState(product.category || categories[0] || "フード");
   const [customCat, setCustomCat] = useState(false);
+  const [bottleBack, setBottleBack] = useState(!!product.bottleBack);
+
+  const isBottleCategory = category.trim() === "ボトル";
+
+  // カテゴリが「ボトル」以外に変わったら、チェックボックスごと選択状態も解除する。
+  useEffect(() => {
+    if (!isBottleCategory) setBottleBack(false);
+  }, [isBottleCategory]);
 
   const existingTP = product.timePrice || null;
   const [tpEnabled, setTpEnabled] = useState(!!existingTP);
@@ -2741,6 +2766,7 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
       name: name.trim(),
       price: Number(price),
       category: category.trim(),
+      bottleBack: isBottleCategory && bottleBack,
       timePrice: tpEnabled ? { start: tpStart, end: tpEnd, price: Number(tpPrice) } : null,
     });
   };
@@ -2751,12 +2777,6 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
         <div style={{ fontFamily: DISPLAY, fontSize: 18, fontWeight: 700, marginBottom: 18, color: COLORS.ink }}>
           {product.id ? "商品を編集" : "商品を追加"}
         </div>
-
-        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>商品名</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%", padding: "9px 10px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, marginTop: 4, marginBottom: 14, fontSize: 14 }} />
-
-        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>通常価格</label>
-        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ width: "100%", padding: "9px 10px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, marginTop: 4, marginBottom: 14, fontFamily: MONO, fontSize: 14 }} />
 
         <label style={{ fontSize: 12, color: COLORS.inkSoft }}>カテゴリ</label>
         {!customCat ? (
@@ -2777,6 +2797,19 @@ function ProductEditModal({ product, categories, onCancel, onSave }) {
         ) : (
           <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="新しいカテゴリ名" style={{ width: "100%", padding: "9px 10px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, marginTop: 4, marginBottom: 14, fontSize: 14 }} />
         )}
+
+        {isBottleCategory && (
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: -6, marginBottom: 14 }}>
+            <input type="checkbox" checked={bottleBack} onChange={(e) => setBottleBack(e.target.checked)} style={{ width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, color: COLORS.ink }}>ボトルバック</span>
+          </label>
+        )}
+
+        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>商品名</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%", padding: "9px 10px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, marginTop: 4, marginBottom: 14, fontSize: 14 }} />
+
+        <label style={{ fontSize: 12, color: COLORS.inkSoft }}>通常価格</label>
+        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ width: "100%", padding: "9px 10px", borderRadius: 6, border: `1.5px solid ${COLORS.line}`, marginTop: 4, marginBottom: 14, fontFamily: MONO, fontSize: 14 }} />
 
         <div style={{ borderTop: `1px dashed ${COLORS.line}`, marginTop: 4, paddingTop: 14, marginBottom: 4 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -3100,7 +3133,7 @@ function App() {
       guests: seat.guests,
       companion: companionLabel(seat.companion),
       companionKind,
-      salesBackAmount: companionKind ? computeSalesBackAmount(bill.subtotal, seat.guests, dataRef.current.payroll.salesBackRates) : 0,
+      salesBackAmount: companionKind ? computeSalesBackAmount(bill.subtotal, seat.guests, dataRef.current.payroll.salesBackRates, seat.orders, dataRef.current.products) : 0,
       startTime: seat.startTime,
       endTime: new Date().toISOString(),
       orders: seat.orders,
