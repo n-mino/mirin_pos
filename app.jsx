@@ -193,7 +193,7 @@ const HEADER_CLOCK_FONT_SIZE = 11;
 // コード自体を変更した日時(固定値)。マスタ設定画面にのみ表示する。
 // コードを変更するたびに、この値を手動で現在日時に更新すること
 // (CACHE_VERSIONのインクリメントとあわせて更新する運用)。
-const APP_LAST_UPDATED = "2026/08/28 15:04";
+const APP_LAST_UPDATED = "2026/08/28 15:44";
 
 // 商品追加/編集モーダルのカテゴリ選択で常に表示するデフォルトのカテゴリ。
 // 既存商品が使っている他のカテゴリ(「+新規」で追加したものを含む)は
@@ -306,6 +306,13 @@ function companionKindLabel(kind) {
   return kind === "call" ? "呼込" : kind === "companion" ? "同伴" : "";
 }
 
+// 売上バックの採用ルールごとに、売上履歴のメモ欄先頭へ自動追記するタグ。
+const SALES_BACK_TAGS = {
+  over30k: "売上バック(3)",
+  group5over50k: "売上バック(5)",
+  bottle: "売上バック(B)",
+};
+
 // 会計確定時に呼込み/同伴の担当者へつく売上バックの金額を計算する。
 // 「5人以上+小計50,000円超」は「小計30,000円超」も自動的に満たすため、
 // 両方に該当する場合は高い方(5人以上+50,000円超)の率のみを採用する(加算しない)。
@@ -316,6 +323,8 @@ function companionKindLabel(kind) {
 // 自動追加料金(orders内のisCompanionFee行、実際の商品売上ではない)を除外する。
 // これを含めたままだと、同伴の場合だけ小計が実質+3,000円されて閾値を跨ぎやすくなり、
 // 同じ商品構成でも呼込みと結果がずれてしまうため。
+// 戻り値は{amount, key}。keyはどのルールを採用したか(SALES_BACK_TAGSのキー。
+// 採用なしはnull)で、売上履歴のメモ欄先頭への自動タグ付けに使う。
 function computeSalesBackAmount(subtotal, guests, salesBackRates, orders, products) {
   const rates = salesBackRates || {};
   // 既存端末のlocalStorageはpayrollオブジェクトを丸ごと上書きする浅いマージのため、
@@ -340,11 +349,12 @@ function computeSalesBackAmount(subtotal, guests, salesBackRates, orders, produc
   const bottleRaw = bottleSubtotal > 0 ? bottleSubtotal * (rateFor("bottle") / 100) : 0;
 
   const raw = Math.max(baseRaw, bottleRaw);
-  if (raw <= 0) return 0;
+  if (raw <= 0) return { amount: 0, key: null };
+  const key = baseRaw >= bottleRaw ? baseKey : "bottle";
+
   const mode = rates.roundMode || "floor";
-  if (mode === "ceil") return Math.ceil(raw);
-  if (mode === "round") return Math.round(raw);
-  return Math.floor(raw);
+  const amount = mode === "ceil" ? Math.ceil(raw) : mode === "round" ? Math.round(raw) : Math.floor(raw);
+  return { amount, key };
 }
 
 function formatElapsed(startIso, nowMs) {
@@ -3136,6 +3146,11 @@ function App() {
     const n = activeSeat;
     const seat = dataRef.current.seats[n];
     const companionKind = companionEffectiveKind(seat.companion, seat.companionKind);
+    const salesBack = companionKind
+      ? computeSalesBackAmount(bill.subtotal, seat.guests, dataRef.current.payroll.salesBackRates, seat.orders, dataRef.current.products)
+      : { amount: 0, key: null };
+    const salesBackTag = salesBack.key ? SALES_BACK_TAGS[salesBack.key] : "";
+    const finalMemo = salesBackTag ? `${salesBackTag}${memo ? ` ${memo}` : ""}` : memo || "";
     const record = {
       id: uid("sale"),
       seatId: n,
@@ -3143,7 +3158,7 @@ function App() {
       guests: seat.guests,
       companion: companionLabel(seat.companion),
       companionKind,
-      salesBackAmount: companionKind ? computeSalesBackAmount(bill.subtotal, seat.guests, dataRef.current.payroll.salesBackRates, seat.orders, dataRef.current.products) : 0,
+      salesBackAmount: salesBack.amount,
       startTime: seat.startTime,
       endTime: new Date().toISOString(),
       orders: seat.orders,
@@ -3154,7 +3169,7 @@ function App() {
       tax: bill.tax,
       total: bill.total,
       payments,
-      memo: memo || "",
+      memo: finalMemo,
     };
     const newSeats = { ...dataRef.current.seats };
     delete newSeats[n];
